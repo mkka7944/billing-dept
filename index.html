@@ -984,7 +984,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 05-Jan 11:24 AM 
+                Updated: 05-Jan 12:42 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1634,10 +1634,16 @@
                 status.innerHTML = `<span style="color:#2563eb;">Verifying access for ${payload.email}...</span>`;
                 
                 try {
-                    // Roles DB removed: Defaulting to admin access for authenticated users
-                    const role = 'admin'; 
+                    // Fetch Roles Database
+                    const rolesRes = await fetch('roles.json');
+                    if(!rolesRes.ok) throw new Error("Could not load roles database.");
+                    const roles = await rolesRes.json();
                     
-                    // Success!
+                    const isAuthorized = roles.admins.includes(payload.email) || roles.field_staff.includes(payload.email);
+                    if(!isAuthorized) throw new Error("Unauthorized User Email.");
+                    
+                    const role = roles.admins.includes(payload.email) ? 'admin' : 'staff';
+                    
                     // Success!
                     window.USER = { 
                         email: payload.email, 
@@ -1705,6 +1711,13 @@
                             fallbackEl.style.display = 'none';
                         }
                     }
+                    
+                    // Apply Role-Based Gating
+                    if(window.USER.role === 'staff') {
+                        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+                    } else {
+                        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+                    }
                 }
             };
             
@@ -1751,10 +1764,8 @@
                         loadingOverlay.remove();
                         if(window.App && window.App.init) {
                             window.App.init();
-                            // Apply Role-Based Gating
-                            if(window.USER.role === 'staff') {
-                                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-                            }
+                            // Role-Based Gating is handled in Auth.updateUI()
+                            Auth.updateUI();
                         } else {
                             console.error("App.init missing!");
                             alert("Initialization Error: App logic not found.");
