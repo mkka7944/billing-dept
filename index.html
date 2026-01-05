@@ -603,6 +603,7 @@
             position: fixed; inset: 0; z-index: 8000;
             background: #f8fafc; display: none; flex-direction: column;
             animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            touch-action: pan-y;
         }
         
         .dash-layout {
@@ -700,7 +701,7 @@
             border-color: var(--primary); background: white; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
         }
         
-        .paid-table-container { flex: 1; overflow: auto; background: white; }
+        .paid-table-container { flex: 1; overflow: auto; background: white; -webkit-overflow-scrolling: touch; }
         .paid-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1300px; }
         .paid-table th { 
             position: sticky; top: 0; background: #f8fafc; z-index: 10;
@@ -709,6 +710,49 @@
             letter-spacing: 0.5px;
         }
         .paid-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        
+        /* Mobile Specific Overwrites */
+        @media (max-width: 768px) {
+            .dashboard-header { padding: 12px 16px; flex-direction: column; align-items: stretch; }
+            .dash-main-content { padding: 12px; gap: 12px; overflow-y: auto !important; height: 100%; }
+            .dashboard-stats-grid { grid-template-columns: 1fr; gap: 8px; }
+            .dash-filters { flex-direction: column; gap: 10px; padding: 15px; }
+            .dash-filter-item { width: 100%; }
+            .dash-filter-item input, .dash-filter-item select { width: 100% !important; }
+            
+            /* Table to Cards Transformation */
+            .paid-table thead { display: none; }
+            .paid-table, .paid-table tbody, .paid-table tr, .paid-table td { display: block; width: 100%; min-width: 0 !important; }
+            .paid-table tr { 
+                background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; 
+                margin-bottom: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+                position: relative; overflow: hidden;
+            }
+            .paid-table tr:active { transform: scale(0.98); background: #f1f5f9; }
+            .paid-table td { 
+                display: flex; justify-content: space-between; align-items: center; 
+                padding: 6px 0; border: none; font-size: 13px; color: #475569;
+                white-space: normal; text-align: right;
+            }
+            .paid-table td:first-child { border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 10px; font-weight: 800; color: #1e293b; text-align: left; }
+            .paid-table td:first-child::before { content: "Serial Number: "; }
+            .paid-table td::before { 
+                content: attr(data-label); font-weight: 700; color: #94a3b8; 
+                font-size: 11px; text-transform: uppercase; margin-right: 12px;
+                min-width: 100px; text-align: left;
+            }
+            
+            .paid-table-container { overflow-y: visible; }
+            .dash-footer { flex-direction: column; gap: 16px; padding: 16px; align-items: center; }
+            .pagination-controls { width: 100%; justify-content: center; }
+            
+            .dash-sidebar { 
+                position: absolute; left: 0; top: 0; bottom: 0; width: 280px; 
+                z-index: 100; transform: translateX(-100%); transition: transform 0.3s;
+                box-shadow: 10px 0 30px rgba(0,0,0,0.1); 
+            }
+            .dash-sidebar.active { transform: translateX(0); }
+        }
         .paid-table tr:hover { background: #f8fafc; cursor: pointer; }
         .paid-table tr:hover td { color: var(--primary); }
         
@@ -984,7 +1028,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 05-Jan 03:25 PM 
+                Updated: 05-Jan 03:52 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1276,7 +1320,7 @@
     <div id="list-view-stage">
         <div class="list-nav">
             <div style="display:flex; gap:8px;">
-                <button onclick="ViewSwitcher.toMap()" class="gal-btn" style="background:#f1f5f9; color:var(--text);" title="Back"><span class="material-icons-round">arrow_back</span></button>
+                <button onclick="ViewSwitcher.back()" class="gal-btn" style="background:#f1f5f9; color:var(--text);" title="Back"><span class="material-icons-round">arrow_back</span></button>
                 <button onclick="Sidebar.toggle()" class="gal-btn mobile-sidebar-toggle" style="background:#eff6ff; color:var(--primary);" title="Filters"><span class="material-icons-round">tune</span></button>
             </div>
             <div style="font-weight:700">Record <span id="lv-idx">1</span> of <span id="lv-total">0</span></div>
@@ -2604,11 +2648,13 @@
                 const stage = document.getElementById('paid-dashboard-stage');
                 if(stage) stage.style.display = 'none';
                 
+                // If we didn't come from dashboard, it's a map origin
+                if(State.originView !== 'dashboard') State.originView = 'map';
+
                 State.currentIdx = 0;
                 ListView.render();
                 document.getElementById('map').style.visibility = 'hidden';
                 
-                // Small delay to ensure display is toggled properly if return from list to map happens
                 setTimeout(() => {
                     if(State.map) State.map.invalidateSize();
                 }, 50);
@@ -2619,9 +2665,8 @@
             document.getElementById('list-view-stage').classList.remove('active');
             document.getElementById('paid-dashboard-stage').style.display = 'none';
             document.getElementById('map').style.visibility = 'visible';
-            State.originView = 'map'; // Global reset to map origin
+            State.originView = 'map'; 
             
-            // Fix Leaflet tile loading issue after being hidden
             setTimeout(() => {
                 if(State.map) State.map.invalidateSize();
             }, 50);
@@ -2631,7 +2676,17 @@
             document.getElementById('paid-dashboard-stage').style.display = 'flex';
             document.getElementById('list-view-stage').classList.remove('active');
             document.getElementById('map').style.visibility = 'hidden';
-            Sidebar.close();
+            State.originView = 'dashboard';
+            
+            // Only auto-close sidebar on mobile
+            if(window.innerWidth <= 768) Sidebar.close();
+        },
+        back() {
+            if(State.originView === 'dashboard') {
+                this.toDashboard();
+            } else {
+                this.toMap();
+            }
         }
     };
 
@@ -3281,12 +3336,38 @@
             if (!select) return;
             
             const savedEmail = this.getEmail();
+            const currentUserEmail = (window.USER && window.USER.email) ? window.USER.email.toLowerCase() : '';
+            
             let html = '<option value="">Select Surveyor Email</option>';
             emails.forEach(email => {
-                const selected = email.toLowerCase() === savedEmail.toLowerCase() ? 'selected' : '';
-                html += `<option value="${email}" ${selected}>${email}</option>`;
+                const isMe = email.toLowerCase() === currentUserEmail;
+                const isSelected = email.toLowerCase() === savedEmail.toLowerCase();
+                
+                // Use symbols to visually distinguish
+                const prefix = isMe ? '● ' : '○ ';
+                const label = prefix + email + (isMe ? ' (You)' : '');
+                
+                html += `<option value="${email}" ${isSelected ? 'selected' : ''} style="${!isMe ? 'color:#94a3b8;' : 'font-weight:bold;'}">${label}</option>`;
             });
             select.innerHTML = html;
+            
+            // Apply visual dimming to the select element itself if an inactive email is selected
+            select.onchange = (e) => {
+                const val = e.target.value;
+                this.saveEmail(val);
+                if (val && val.toLowerCase() !== currentUserEmail) {
+                    select.style.opacity = '0.6';
+                    select.style.fontStyle = 'italic';
+                } else {
+                    select.style.opacity = '1';
+                    select.style.fontStyle = 'normal';
+                }
+            };
+            // Initial style check
+            if (savedEmail && savedEmail.toLowerCase() !== currentUserEmail) {
+                select.style.opacity = '0.6';
+                select.style.fontStyle = 'italic';
+            }
         },
 
         async fetchAllSyncedData() {
@@ -4313,19 +4394,19 @@
                     
                     return `
                         <tr onclick="PaidBills.jumpToRecord('${sid}')">
-                            <td>${r[0]}</td> <!-- Sr# -->
-                            <td>${sidDisplay}</td>
-                            <td style="font-family:monospace; font-weight:700; color:#475569;">${r[2]}</td> <!-- PSID -->
-                            <td>${r[3]}</td> <!-- City -->
-                            <td>${r[4]}</td> <!-- Month -->
-                            <td>${r[5]}</td> <!-- Office -->
-                            <td>${r[6]}</td> <!-- UC -->
-                            <td style="font-size:11px; font-weight:700; color:#64748b;">${r[7]}</td> <!-- Category -->
-                            <td>Rs. ${parseFloat(r[8]).toLocaleString()}</td> <!-- Due Amt -->
-                            <td>Rs. ${parseFloat(r[9]).toLocaleString()}</td> <!-- Fine -->
-                            <td style="font-size:11px; font-weight:700; color:#64748b;">${r[10]}</td> <!-- Channel -->
-                            <td style="font-weight:600;">${r[11]}</td> <!-- Date -->
-                            <td style="font-weight:800; color:#16a34a;">Rs. ${parseFloat(r[12]).toLocaleString()}</td> <!-- Paid Amt -->
+                            <td data-label="Sr#">${r[0]}</td>
+                            <td data-label="Survey ID">${sidDisplay}</td>
+                            <td data-label="PSID" style="font-family:monospace; font-weight:700; color:#475569;">${r[2]}</td>
+                            <td data-label="City">${r[3]}</td>
+                            <td data-label="Month">${r[4]}</td>
+                            <td data-label="Office">${r[5]}</td>
+                            <td data-label="Area">${r[6]}</td>
+                            <td data-label="Category" style="font-size:11px; font-weight:700; color:#64748b;">${r[7]}</td>
+                            <td data-label="Due Amount">Rs. ${parseFloat(r[8]).toLocaleString()}</td>
+                            <td data-label="Fine">Rs. ${parseFloat(r[9]).toLocaleString()}</td>
+                            <td data-label="Channel" style="font-size:11px; font-weight:700; color:#64748b;">${r[10]}</td>
+                            <td data-label="Paid Date" style="font-weight:600;">${r[11]}</td>
+                            <td data-label="Paid Amount" style="font-weight:800; color:#16a34a;">Rs. ${parseFloat(r[12]).toLocaleString()}</td>
                         </tr>
                     `;
                 }).join('');
