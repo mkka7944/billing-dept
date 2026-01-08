@@ -1028,7 +1028,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 08-Jan 03:46 PM 
+                Updated: 08-Jan 04:09 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -2000,7 +2000,7 @@
                 
                 // Wait for List to Populate (now with FULL data)
                 setTimeout(() => {
-                    const searchInput = document.getElementById('lv-search');
+                    const searchInput = document.getElementById('lv-search-id');
                     if(searchInput) {
                         searchInput.value = sid;
                         ListView.render(); // This filters State.filtered by the search term
@@ -2075,16 +2075,31 @@
         },
         
         setToday() {
-            const today = new Date();
-            if(State.fpStart) State.fpStart.setDate(today, true);
-            if(State.fpEnd) State.fpEnd.setDate(today, true);
-            // apply is triggered by onChange in flatpickr, but just in case:
+            // 1. Reset everything to ensure we see the records no matter the current filter
+            // This is "Global View" mode for Today.
+            this.toggleAll('f-dist', true);
+            this.toggleAll('f-tehsil', true);
+            this.toggleAll('f-mc', true);
+            
+            // Clear other search filters
+            const input = document.getElementById('lv-search-id');
+            if(input) input.value = '';
+
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${y}-${m}-${d}`;
+            
+            if(State.fpStart) State.fpStart.setDate(todayStr, true);
+            if(State.fpEnd) State.fpEnd.setDate(todayStr, true);
+            
             this.apply();
         },
 
         clearDates() {
-            if(State.fpStart) State.fpStart.clear();
-            if(State.fpEnd) State.fpEnd.clear();
+            this.resetFilters();
+            // Re-apply to show default (Sargodha) view
             this.apply();
         },
 
@@ -2451,12 +2466,12 @@
             const start = document.getElementById('f-start').value;
             const end = document.getElementById('f-end').value;
             if (start || end) {
-                const s = start ? new Date(start) : null;
-                const e = end ? new Date(end) : null;
+                // String comparison is robust for YYYY-MM-DD
                 filtered = filtered.filter(r => {
-                    const d = new Date(r[7]);
-                    if (s && d < s) return false;
-                    if (e && d > e) return false;
+                    const dStr = r[7];
+                    if (!dStr || dStr === 'NaT' || dStr === '-' || dStr === '0000-00-00') return false;
+                    if (start && dStr < start) return false;
+                    if (end && dStr > end) return false;
                     return true;
                 });
             }
