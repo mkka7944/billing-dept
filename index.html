@@ -1028,7 +1028,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 08-Jan 02:11 PM 
+                Updated: 08-Jan 03:16 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -2738,13 +2738,23 @@
                         <span class="material-icons-round" style="color:var(--primary); font-size:22px;">search</span>
                         <input type="text" id="lv-search-id" placeholder="Go to ID or Search..." 
                             style="flex:1; border:none; padding:10px 0; outline:none; font-weight:700; color:var(--text); font-size:14px;"
-                            onkeydown="if(event.key==='Enter') ListView.jumpToID(this.value)">
+                            onkeydown="if(event.key==='Enter') ListView.jumpToID(this.value)"
+                            oninput="ListView.toggleClearBtn(this.value)">
+                        <button id="lv-search-clear" onclick="ListView.clearSearch()" style="display:none; background:none; border:none; color:#94a3b8; cursor:pointer;" title="Clear Search">
+                            <span class="material-icons-round" style="font-size:20px;">cancel</span>
+                        </button>
                         <button onclick="UniversalSearch.open()" style="background:none; border:none; color:#64748b; cursor:pointer; display:flex; align-items:center;" title="Global Search">
                             <span class="material-icons-round" style="font-size:22px;">travel_explore</span>
                         </button>
                     </div>
                 `;
             }
+
+            // Show clear button if input has value
+            setTimeout(() => {
+                const input = document.getElementById('lv-search-id');
+                if(input) ListView.toggleClearBtn(input.value);
+            }, 50);
 
             // 2. Clear Label if coming back from restore
             const statLabel = document.getElementById('stat-label');
@@ -3008,6 +3018,23 @@
                 } else {
                     App.showToast ? App.showToast(`ID #${id} not found.`) : alert(`ID #${id} not found.`);
                 }
+            }
+        },
+
+        toggleClearBtn(val) {
+            const btn = document.getElementById('lv-search-clear');
+            if(!btn) return;
+            btn.style.display = (val || State.history.length > 0) ? 'block' : 'none';
+        },
+
+        clearSearch() {
+            const input = document.getElementById('lv-search-id');
+            if(input) input.value = '';
+            this.toggleClearBtn('');
+            
+            // If we are in a search result/isolated view, go back
+            if(State.history.length > 0) {
+                ViewSwitcher.back();
             }
         }
     };
