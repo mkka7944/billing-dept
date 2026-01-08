@@ -1028,7 +1028,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 08-Jan 01:12 PM 
+                Updated: 08-Jan 02:06 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1558,6 +1558,11 @@
             <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#64748b; cursor:pointer;"><input type="checkbox" class="search-cat" data-field="addr"> Address</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#64748b; cursor:pointer;"><input type="checkbox" class="search-cat" data-field="surveyor"> Surveyor</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#64748b; cursor:pointer;"><input type="checkbox" class="search-cat" data-field="mcuc"> MC/UC</label>
+            <div style="width:1px; height:16px; background:#e2e8f0; margin:0 4px;"></div>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:var(--primary); cursor:pointer;" title="Limit search to currently active sidebar filters">
+                <input type="checkbox" id="search-local-toggle" onchange="State.searchLocalOnly = this.checked; UniversalSearch.performSearch(document.getElementById('universal-search-input').value)">
+                Search within filters
+            </label>
         </div>
         <div class="search-dropdowns" style="padding:15px 24px; display:flex; gap:12px; flex-wrap:wrap; border-bottom:1px solid #f1f5f9; background:#fff;">
             <div id="search-tehsil" style="flex:1; min-width:140px;"></div>
@@ -1852,7 +1857,9 @@
         driveOnlyFilter: false,
         originView: 'map', // Track origin for navigation (map, dashboard)
         quickFilters: { domestic: true, commercial: true },
-        lastHighlightedSurveyor: null
+        lastHighlightedSurveyor: null,
+        history: [], // [{ filtered, idx, label }] for back navigation
+        searchLocalOnly: false // Toggle for searching within current filters
     };
 
     const App = {
@@ -2684,6 +2691,19 @@
             if(window.innerWidth <= 768) Sidebar.close();
         },
         back() {
+            // Priority 1: Check History Stack (Multi-level back)
+            if (State.history && State.history.length > 0) {
+                const prev = State.history.pop();
+                State.filtered = prev.filtered;
+                State.currentIdx = prev.idx;
+                
+                // If we popped back from a single search results, maybe we need to refresh UI
+                App.render(); 
+                ListView.render();
+                return;
+            }
+
+            // Priority 2: Origin Fallback
             if(State.originView === 'dashboard') {
                 this.toDashboard();
             } else {
@@ -2695,26 +2715,51 @@
     const ListView = {
         render() {
             if (State.currentIdx >= State.filtered.length && State.filtered.length > 0) {
-                State.currentIdx = 0;
+                 State.currentIdx = 0;
             }
             const r = State.filtered[State.currentIdx];
-            if (r) App.updateSurveyors(r[6]); // Contextual highlight/sort
+            if (!r) {
+                document.getElementById('lv-content').innerHTML = `
+                    <div style="text-align:center; padding:100px 20px; color:#94a3b8;">
+                        <span class="material-icons-round" style="font-size:64px; opacity:0.2; display:block; margin-bottom:16px;">search_off</span>
+                        <div style="font-weight:700; font-size:18px;">No Records Found</div>
+                        <div style="font-size:14px; margin-top:8px;">Try adjusting your filters or use Global Search.</div>
+                        <button onclick="UniversalSearch.open()" style="margin-top:24px; background:var(--primary); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; cursor:pointer;">Open Global Search</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // 1. Initialize Search Bar if not present
+            const searchContainer = document.getElementById('lv-search-container');
+            if(searchContainer && !searchContainer.innerHTML) {
+                searchContainer.innerHTML = `
+                    <div style="background:white; border-radius:15px; display:flex; align-items:center; padding:5px 15px; box-shadow:0 4px 15px rgba(0,0,0,0.08); border:1px solid #e2e8f0; gap:10px;">
+                        <span class="material-icons-round" style="color:var(--primary); font-size:22px;">search</span>
+                        <input type="text" id="lv-search-id" placeholder="Go to ID or Search..." 
+                            style="flex:1; border:none; padding:10px 0; outline:none; font-weight:700; color:var(--text); font-size:14px;"
+                            onkeydown="if(event.key==='Enter') ListView.jumpToID(this.value)">
+                        <button onclick="UniversalSearch.open()" style="background:none; border:none; color:#64748b; cursor:pointer; display:flex; align-items:center;" title="Global Search">
+                            <span class="material-icons-round" style="font-size:22px;">travel_explore</span>
+                        </button>
+                    </div>
+                `;
+            }
+
+            // 2. Clear Label if coming back from restore
+            const statLabel = document.getElementById('stat-label');
+            if (statLabel && State.history.length === 0) statLabel.innerText = "Live Survey Data";
             
             const el = document.getElementById('lv-content');
-            const total = State.filtered.length;
             
-            document.getElementById('lv-idx').innerText = total > 0 ? State.currentIdx + 1 : 0;
-            document.getElementById('lv-total').innerText = total;
+            document.getElementById('lv-idx').innerText = State.currentIdx + 1;
+            document.getElementById('lv-total').innerText = State.filtered.length;
 
             // Integrity: Clear pending sync files when switching records
             DriveSync.files = []; 
 
-            // Ensure filters are rendered if not already
-            if (!document.getElementById('lv-surveyor-dropdown')) {
-                // No longer needed as filters are unified in the sidebar
-                const navFilter = document.getElementById('lv-search-container');
-                if (navFilter) navFilter.innerHTML = '';
-            }
+            // Surveyors are now unified in the sidebar
+            // No need to clear search container here
 
             if(!r) { 
                 el.innerHTML = `
@@ -2846,9 +2891,7 @@
 
         jumpFromMap(id) {
             ViewSwitcher.toList();
-            // Critical: If coming from a single-search result, restore context first
-            if(State.lastView) ListView.restoreView(); 
-
+            
             setTimeout(() => {
                 this.jumpToID(id);
                 // Background maintenance: Ensure any existing search input is updated
@@ -2862,12 +2905,12 @@
             const record = RAW_DATA.find(r => r[0].toString() === id.toString());
             if (!record) return;
             
-            // State Preservation: Save current filtered state to return later
-            // We save a deep copy of the filtered array and the current index
-            State.lastView = {
+            // State Preservation: Push current state to history stack
+            State.history.push({
                 filtered: [...State.filtered],
-                idx: State.currentIdx
-            };
+                idx: State.currentIdx,
+                label: document.getElementById('stat-label').innerText
+            });
 
             // Override Filters to show only this record
             State.filtered = [record];
@@ -2888,20 +2931,12 @@
             // Update Label with Restore option
             const statLabel = document.getElementById('stat-label');
             if(statLabel) {
-                statLabel.innerHTML = `Single ID Mode <a href="javascript:void(0)" onclick="ListView.restoreView()" style="color:var(--primary); margin-left:8px; text-decoration:underline;">[Return to List]</a>`;
+                statLabel.innerHTML = `Isolated Mode <a href="javascript:void(0)" onclick="ViewSwitcher.back()" style="color:var(--primary); margin-left:8px; text-decoration:underline;">[Return]</a>`;
             }
         },
 
         restoreView() {
-            if (State.lastView) {
-                State.filtered = [...State.lastView.filtered];
-                State.currentIdx = State.lastView.idx;
-                State.lastView = null;
-            }
-            App.render();
-            if(document.getElementById('list-view-stage').classList.contains('active')) {
-                this.render();
-            }
+            ViewSwitcher.back();
         },
 
         toggleSortDropdown() {
@@ -2958,12 +2993,18 @@
             } else {
                 const record = RAW_DATA.find(r => r[0].toString().trim() === searchId);
                 if (record) {
-                    if(!State.lastView) State.lastView = { filtered: [...State.filtered], idx: State.currentIdx };
+                    // Save context before jumping to a record outside current filters
+                    State.history.push({ 
+                        filtered: [...State.filtered], 
+                        idx: State.currentIdx, 
+                        label: document.getElementById('stat-label').innerText 
+                    });
+
                     State.filtered = [record];
                     State.currentIdx = 0;
                     this.render();
                     const statLabel = document.getElementById('stat-label');
-                    if(statLabel) statLabel.innerHTML = `Single ID Mode <a href="javascript:void(0)" onclick="ListView.restoreView()" style="color:var(--primary); margin-left:8px; text-decoration:underline; font-size:10px;">[RETURN]</a>`;
+                    if(statLabel) statLabel.innerHTML = `Search Result <a href="javascript:void(0)" onclick="ViewSwitcher.back()" style="color:var(--primary); margin-left:8px; text-decoration:underline; font-size:10px;">[RETURN]</a>`;
                 } else {
                     App.showToast ? App.showToast(`ID #${id} not found.`) : alert(`ID #${id} not found.`);
                 }
@@ -4651,11 +4692,14 @@
             const selectedCats = Array.from(document.querySelectorAll('.search-cat:checked')).map(cb => cb.getAttribute('data-field'));
             const isGlobal = selectedCats.length === 0;
 
-            const results = RAW_DATA.filter(r => {
+            const dataSource = State.searchLocalOnly ? State.filtered : RAW_DATA;
+
+            const results = dataSource.filter(r => {
                 const name = decodePII(r[4]);
                 const addr = decodePII(r[5]);
                 const psid = decodePII(r[15]);
 
+                // Region filters in the modal are additional constraints
                 if (tehsilSub !== 'all' && r[11] !== tehsilSub) return false;
                 if (mcucSub !== 'all' && r[12] !== mcucSub) return false;
                 if (surveyorSub !== 'all' && r[6] !== surveyorSub) return false;
@@ -4667,8 +4711,8 @@
                            (psid && psid.toString().toLowerCase().includes(q)) ||
                            (name && name.toLowerCase().includes(q)) ||
                            (addr && addr.toLowerCase().includes(q)) ||
-                           (r[6] && r[6].toLowerCase().includes(q)) ||
-                           (r[12] && r[12].toLowerCase().includes(q));
+                           (r[12] && r[12].toLowerCase().includes(q)) ||
+                           (r[6] && r[6].toLowerCase().includes(q));
                 } else {
                     if (selectedCats.includes('id') && r[0] && r[0].toString().toLowerCase().includes(q)) return true;
                     if (selectedCats.includes('psid') && psid && psid.toString().toLowerCase().includes(q)) return true;
