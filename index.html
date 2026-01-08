@@ -1028,7 +1028,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 08-Jan 03:16 PM 
+                Updated: 08-Jan 03:29 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -2646,7 +2646,7 @@
     };
 
     const ViewSwitcher = {
-        toList() {
+        toList(resetIdx = true) {
             try {
                 document.getElementById('main-stage').classList.add('hide-map-ui');
                 document.getElementById('list-view-stage').classList.add('active');
@@ -2656,7 +2656,7 @@
                 // If we didn't come from dashboard, it's a map origin
                 if(State.originView !== 'dashboard') State.originView = 'map';
 
-                State.currentIdx = 0;
+                if(resetIdx) State.currentIdx = 0;
                 ListView.render();
                 document.getElementById('map').style.visibility = 'hidden';
                 
@@ -2697,9 +2697,19 @@
                 State.filtered = prev.filtered;
                 State.currentIdx = prev.idx;
                 
-                // If we popped back from a single search results, maybe we need to refresh UI
+                // Clear search box on back
+                const input = document.getElementById('lv-search-id');
+                if(input) {
+                    input.value = '';
+                    ListView.toggleClearBtn ? ListView.toggleClearBtn('') : (document.getElementById('lv-search-clear').style.display = 'none');
+                }
+
+                // Restore Label
+                const statLabel = document.getElementById('stat-label');
+                if(statLabel && prev.label) statLabel.innerHTML = prev.label;
+                else if(statLabel && State.history.length === 0) statLabel.innerText = "Live Survey Data";
+
                 App.render(); 
-                ListView.render();
                 return;
             }
 
@@ -2757,8 +2767,7 @@
             }, 50);
 
             // 2. Clear Label if coming back from restore
-            const statLabel = document.getElementById('stat-label');
-            if (statLabel && State.history.length === 0) statLabel.innerText = "Live Survey Data";
+            // Removed redundant label reset to prevent overwriting sidebar filters
             
             const el = document.getElementById('lv-content');
             
@@ -2900,7 +2909,7 @@
         prev() { if(State.currentIdx > 0) { State.currentIdx--; this.render(); }},
 
         jumpFromMap(id) {
-            ViewSwitcher.toList();
+            ViewSwitcher.toList(false);
             
             setTimeout(() => {
                 this.jumpToID(id);
@@ -2995,30 +3004,37 @@
         jumpToID(id) {
             if(!id) return;
             const searchId = id.toString().trim();
+            
+            // Check current list first
             const idx = State.filtered.findIndex(r => r[0].toString().trim() === searchId);
             
+            // Always push context before a search jump (even if in same list)
+            State.history.push({ 
+                filtered: [...State.filtered], 
+                idx: State.currentIdx, 
+                label: document.getElementById('stat-label').innerText 
+            });
+
             if (idx !== -1) {
                 State.currentIdx = idx;
                 this.render();
+                const statLabel = document.getElementById('stat-label');
+                if(statLabel) statLabel.innerHTML = `Linked ID Match <a href="javascript:void(0)" onclick="ViewSwitcher.back()" style="color:var(--primary); margin-left:8px; text-decoration:underline; font-size:10px;">[RETURN]</a>`;
             } else {
                 const record = RAW_DATA.find(r => r[0].toString().trim() === searchId);
                 if (record) {
-                    // Save context before jumping to a record outside current filters
-                    State.history.push({ 
-                        filtered: [...State.filtered], 
-                        idx: State.currentIdx, 
-                        label: document.getElementById('stat-label').innerText 
-                    });
-
                     State.filtered = [record];
                     State.currentIdx = 0;
                     this.render();
                     const statLabel = document.getElementById('stat-label');
                     if(statLabel) statLabel.innerHTML = `Search Result <a href="javascript:void(0)" onclick="ViewSwitcher.back()" style="color:var(--primary); margin-left:8px; text-decoration:underline; font-size:10px;">[RETURN]</a>`;
                 } else {
+                    // Pop history if search failed so we don't store a "failed jump" state
+                    State.history.pop();
                     App.showToast ? App.showToast(`ID #${id} not found.`) : alert(`ID #${id} not found.`);
                 }
             }
+            this.toggleClearBtn(searchId);
         },
 
         toggleClearBtn(val) {
