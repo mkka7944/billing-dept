@@ -1028,7 +1028,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 05-Jan 05:30 PM 
+                Updated: 08-Jan 12:28 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1662,11 +1662,15 @@
                 } catch(e) { return null; }
             }
 
-            // PII Decoder
+            // PII Decoder (v7.5)
             function decodePII(val) {
                 if(!val || val === '-') return val;
                 try {
-                    return atob(val);
+                    // Robust UTF-8 decoding for Base64
+                    const b64 = atob(val);
+                    const bytes = new Uint8Array(b64.length);
+                    for (let i = 0; i < b64.length; i++) bytes[i] = b64.charCodeAt(i);
+                    return new TextDecoder().decode(bytes);
                 } catch(e) { return val; }
             }
 
@@ -2611,12 +2615,12 @@
                         
                         <div style="font-size:12px; margin-bottom:8px">
                             <div style="margin-bottom:8px;">
-                                <b style="display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:85%;">${r[6]}</b>
-                                <span style="font-size:10px; color:#64748b;">${r[3]===1?'Commercial':'Domestic'}</span>
+                                <b style="display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:85%;">${decodePII(r[4])}</b>
+                                <span style="font-size:10px; color:#64748b;">${r[6]} | ${r[3]===1?'Commercial':'Domestic'}</span>
                             </div>
 
                             <div style="border-top:1px solid #f1f5f9; margin:8px 0; padding-top:8px; font-size:11px; color:#475569;">
-                                <div style="display:flex; justify-content:space-between;"><span>PSID:</span> <b>${r[15]}</b></div>
+                                <div style="display:flex; justify-content:space-between;"><span>PSID:</span> <b>${decodePII(r[15])}</b></div>
                                 <div style="display:flex; justify-content:space-between;"><span>Amount:</span> <b>Rs. ${r[17]}</b></div>
                                 <div style="display:flex; justify-content:space-between;"><span>Date:</span> <b>${r[18]}</b></div>
                             </div>
@@ -2667,9 +2671,13 @@
             document.getElementById('map').style.visibility = 'visible';
             State.originView = 'map'; 
             
+            // Immediate resize for responsive layout
+            if(State.map) State.map.invalidateSize();
+
+            // Delayed resize to ensure transitions are finished
             setTimeout(() => {
                 if(State.map) State.map.invalidateSize();
-            }, 50);
+            }, 350);
         },
         toDashboard() {
             document.getElementById('main-stage').classList.add('hide-map-ui');
@@ -2725,7 +2733,7 @@
             // Contextual Naming
             const dists = App.getSelected('f-dist');
             const tehsils = App.getSelected('f-tehsil');
-            let displayName = r[4];
+            let displayName = decodePII(r[4]);
             if(tehsils.length > 1 || dists.length > 1) {
                 displayName += ` (${r[11]})`;
             }
@@ -2769,10 +2777,10 @@
                 <div class="card-grid">
                     <!-- Row 1: Name, PSID, Status -->
                     <div style="grid-column: span 1;">
-                        <div style="color:#2563eb; font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${r[4]}">${r[4]}</div>
+                        <div style="color:#2563eb; font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${decodePII(r[4])}">${decodePII(r[4])}</div>
                     </div>
                     <div style="grid-column: span 1;">
-                        <div style="color:#2563eb; font-weight:800; font-size:14px;">${r[15]}</div>
+                        <div style="color:#2563eb; font-weight:800; font-size:14px;">${decodePII(r[15])}</div>
                     </div>
                     <div style="grid-column: span 1; text-align:right;">
                         <span class="pill ${payStatus}" style="font-size:11px; padding:2px 10px;">${r[16]}</span>
@@ -2791,7 +2799,7 @@
 
                     <!-- Row 3: Address (Full Width) -->
                     <div style="grid-column: span 3; border-top:1px solid #f1f5f9; padding-top:8px;">
-                        <div style="font-weight:600; font-size:13px; color:var(--text); line-height:1.4;">${r[5]}</div>
+                        <div style="font-weight:600; font-size:13px; color:var(--text); line-height:1.4;">${decodePII(r[5])}</div>
                     </div>
 
                     <!-- Row 4: Area (Full Width) -->
@@ -4650,6 +4658,10 @@
             const isGlobal = selectedCats.length === 0;
 
             const results = RAW_DATA.filter(r => {
+                const name = decodePII(r[4]);
+                const addr = decodePII(r[5]);
+                const psid = decodePII(r[15]);
+
                 if (tehsilSub !== 'all' && r[11] !== tehsilSub) return false;
                 if (mcucSub !== 'all' && r[12] !== mcucSub) return false;
                 if (surveyorSub !== 'all' && r[6] !== surveyorSub) return false;
@@ -4658,16 +4670,16 @@
 
                 if (isGlobal) {
                     return (r[0] && r[0].toString().toLowerCase().includes(q)) ||
-                           (r[15] && r[15].toString().toLowerCase().includes(q)) ||
-                           (r[4] && r[4].toLowerCase().includes(q)) ||
-                           (r[5] && r[5].toLowerCase().includes(q)) ||
+                           (psid && psid.toString().toLowerCase().includes(q)) ||
+                           (name && name.toLowerCase().includes(q)) ||
+                           (addr && addr.toLowerCase().includes(q)) ||
                            (r[6] && r[6].toLowerCase().includes(q)) ||
                            (r[12] && r[12].toLowerCase().includes(q));
                 } else {
                     if (selectedCats.includes('id') && r[0] && r[0].toString().toLowerCase().includes(q)) return true;
-                    if (selectedCats.includes('psid') && r[15] && r[15].toString().toLowerCase().includes(q)) return true;
-                    if (selectedCats.includes('name') && r[4] && r[4].toLowerCase().includes(q)) return true;
-                    if (selectedCats.includes('addr') && r[5] && r[5].toLowerCase().includes(q)) return true;
+                    if (selectedCats.includes('psid') && psid && psid.toString().toLowerCase().includes(q)) return true;
+                    if (selectedCats.includes('name') && name && name.toLowerCase().includes(q)) return true;
+                    if (selectedCats.includes('addr') && addr && addr.toLowerCase().includes(q)) return true;
                     if (selectedCats.includes('surveyor') && r[6] && r[6].toLowerCase().includes(q)) return true;
                     if (selectedCats.includes('mcuc') && r[12] && r[12].toLowerCase().includes(q)) return true;
                     return false;
@@ -4693,8 +4705,8 @@
             container.innerHTML = results.map(r => `
                 <div class="search-item" onclick="UniversalSearch.jump('${r[0]}', 'list')">
                     <div class="search-item-main" style="flex:1; min-width:0;">
-                        <div class="search-item-title">#${r[0]} | ${r[4]}</div>
-                        <div class="search-item-sub">${r[15]} | ${r[5]}</div>
+                        <div class="search-item-title">#${r[0]} | ${decodePII(r[4])}</div>
+                        <div class="search-item-sub">${decodePII(r[15])} | ${decodePII(r[5])}</div>
                         <span class="search-item-meta">${r[11]} - ${r[12]}</span>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end; flex-shrink:0;">
