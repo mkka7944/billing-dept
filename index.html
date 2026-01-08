@@ -1028,7 +1028,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 08-Jan 12:28 PM 
+                Updated: 08-Jan 12:51 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1662,16 +1662,10 @@
                 } catch(e) { return null; }
             }
 
-            // PII Decoder (v7.5)
+            // PII Decoder (v7.6) - Removed Base64 to fix Urdu encoding symbols
             function decodePII(val) {
                 if(!val || val === '-') return val;
-                try {
-                    // Robust UTF-8 decoding for Base64
-                    const b64 = atob(val);
-                    const bytes = new Uint8Array(b64.length);
-                    for (let i = 0; i < b64.length; i++) bytes[i] = b64.charCodeAt(i);
-                    return new TextDecoder().decode(bytes);
-                } catch(e) { return val; }
+                return val; // Directly return raw value handled by JSON.parse
             }
 
             async function handleCredentialResponse(response) {
