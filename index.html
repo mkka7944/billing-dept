@@ -534,7 +534,7 @@
         }
         
         .sync-action-btn {
-            height: 52px; border-radius: 14px; border: none;
+            height: 48px; border-radius: 14px; border: none;
             display: flex; align-items: center; justify-content: center; gap: 8px;
             font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s;
         }
@@ -542,8 +542,14 @@
             background: white; color: var(--primary); border: 2px solid var(--primary);
         }
         .sync-action-btn.camera:hover { background: #f0f7ff; }
+
+        .sync-action-btn.gallery {
+            background: #f8fafc; color: #64748b; border: 2px solid #e2e8f0;
+        }
+        .sync-action-btn.gallery:hover { background: #f1f5f9; border-color: #cbd5e1; }
         
         .sync-action-btn.upload {
+            grid-column: span 2;
             background: #10b981; color: white; border: none;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
         }
@@ -1028,7 +1034,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 09-Jan 02:30 PM 
+                Updated: 09-Jan 02:58 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1621,7 +1627,7 @@
     </div>
 </div>
 
-<input type="file" id="drive-upload-input" multiple accept="image/*" style="display:none;" onchange="DriveSync.handleFiles(this.files)">
+
 
 <div id="modal-settings" onclick="if(event.target===this) Settings.close()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:7000; align-items:center; justify-content:center; padding:20px; backdrop-filter: blur(4px);">
     <div style="background:white; border-radius:16px; width:100%; max-width:640px; height: 600px; display:flex; flex-direction:column; box-shadow: 0 20px 50px rgba(0,0,0,0.2); overflow: hidden;">
@@ -2904,11 +2910,15 @@
 
                     <div id="drive-preview" class="sync-preview-strip"></div>
 
-                    <input type="file" id="drive-upload-input" accept="image/*" capture="environment" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
+                    <input type="file" id="drive-input-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
+                    <input type="file" id="drive-input-gallery" accept="image/*" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
                     
                     <div class="sync-action-grid">
-                        <button onclick="document.getElementById('drive-upload-input').click()" class="sync-action-btn camera">
-                            <span class="material-icons-round">photo_camera</span> Take Picture
+                        <button onclick="document.getElementById('drive-input-camera').click()" class="sync-action-btn camera">
+                            <span class="material-icons-round">photo_camera</span> Camera
+                        </button>
+                        <button onclick="document.getElementById('drive-input-gallery').click()" class="sync-action-btn gallery">
+                            <span class="material-icons-round">photo_library</span> Gallery
                         </button>
                         <button id="btn-sync-drive" onclick="DriveSync.upload('${r[0]}')" class="sync-action-btn upload">
                             <span class="material-icons-round">cloud_upload</span> Sync Now
@@ -3538,7 +3548,7 @@
             const sid = this._safeId(surveyId);
             const statusBadge = document.getElementById(`drive-status-${sid}`);
             const syncBtn = document.getElementById('btn-sync-drive');
-            const camBtn = document.querySelector('.sync-action-btn.camera');
+            const actionBtns = document.querySelectorAll('.sync-action-btn:not(.upload)');
             
             if (!statusBadge) return;
             
@@ -3558,7 +3568,7 @@
             }
             
             if (syncBtn) syncBtn.disabled = (this.files.length === 0);
-            if (camBtn) camBtn.disabled = false; // Always enabled now
+            actionBtns.forEach(btn => btn.disabled = false);
         },
 
         // Legacy compatibility: ensure background calls don't crash
