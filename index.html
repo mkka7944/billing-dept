@@ -308,11 +308,27 @@
         .status-warn { background: #fef3c7; color: #92400e; }
         .status-ok { background: #f0fdf4; color: #166534; }
 
-        /* Modern Tooltip */
-        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; }
-        .leaflet-popup-content { margin: 0; width: 220px !important; }
-        .pop-card { padding: 12px; }
-        .pop-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--primary); }
+        /* Map Interactive Focus Fix */
+        path.leaflet-interactive:focus { outline: none !important; }
+
+        /* Modern Tooltip Optimized */
+        .leaflet-tooltip { 
+            background: rgba(255, 255, 255, 0.95); 
+            border: 1px solid #e2e8f0; 
+            border-radius: 6px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            font-size: 11px; 
+            font-weight: 700; 
+            color: #1e293b; 
+            padding: 4px 8px;
+            white-space: nowrap;
+        }
+        .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { border: none !important; }
+
+        /* Settings Modal Desktop Size */
+        @media (min-width: 769px) {
+            #modal-settings .modal-content { max-width: 800px !important; height: 700px !important; }
+        }
 
         /* Advanced Gallery */
         .gallery-overlay { 
@@ -1034,7 +1050,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 20-Jan 11:45 AM 
+                Updated: 20-Jan 12:31 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -4033,8 +4049,31 @@
 
         toggleTooltips() {
             State.showTooltips = !State.showTooltips;
+            
+            // Immediate Update on Map
+            this.activeLayers.forEach(layer => {
+                 // Check if it's a boundary layer (GeoJSON)
+                 if(layer.feature) {
+                     if(State.showTooltips) {
+                         const layerName = layer.options.layerKey ? layer.options.layerKey.split('|')[1] : null;
+                         if(layerName) {
+                             const customMeta = (window.KML_META && window.KML_META[layerName]) ? window.KML_META[layerName] : '';
+                             const content = `
+                                <div style="font-family:Inter, sans-serif; padding:4px;">
+                                    <div style="font-size:10px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px;">Boundary</div>
+                                    <div style="font-size:13px; font-weight:700; color:#1e293b;">${layerName}</div>
+                                    ${customMeta ? `<div style="margin-top:6px; padding-top:6px; border-top:1px solid #f1f5f9; font-size:11px; color:#2563eb; font-weight:600;">${customMeta}</div>` : ''}
+                                </div>
+                             `;
+                             layer.bindTooltip(content, { sticky: true, opacity: 0.95 });
+                         }
+                     } else {
+                         layer.unbindTooltip();
+                     }
+                 }
+            });
+
             this.renderSettingsUI();
-            // Show toast
             this.showToast(`Tooltips ${State.showTooltips ? 'Enabled' : 'Disabled'}`);
         },
         
@@ -4056,14 +4095,231 @@
                 }
             }
             this.renderSettingsUI();
-        }
-    };
+        },
 
+        // Natural Sort Helper
+        naturalSort(a, b) {
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        },
 
-    
-    // Attach Gallery Events
-    const galVp = document.getElementById('gal-vp');
-    galVp.addEventListener('mousedown', e => Gallery.onStart(e));
+        renderSettingsUI() {
+            const container = document.getElementById('settings-layers-container');
+            if (!container) return;
+            
+            // Save scroll position
+            const scrollEl = container.querySelector('.settings-scroll-area');
+            const lastScroll = scrollEl ? scrollEl.scrollTop : 0;
+            
+            let allCityNames = Object.keys(GEO_LAYERS);
+            
+            // Reordering Tabs: Stats, Marker Limit, Sargodha MC (if exists), then others
+            let tabs = ['📊 Stats', '📍 Marker Limit'];
+            
+            const hasSargodha = allCityNames.includes('SARGODHA');
+            if (hasSargodha) {
+                tabs.push('🏢 SARGODHA MC');
+            }
+            
+            // Filter out 'SARGODHA' from the main list if '🏢 SARGODHA MC' is added,
+            // as 'SARGODHA' will be handled separately in the content rendering.
+            let otherCityNames = allCityNames.filter(city => city !== 'SARGODHA');
+            otherCityNames.sort(this.naturalSort); // Apply natural sort to other cities
+            
+            tabs = tabs.concat(otherCityNames);
+            
+            // If 'SARGODHA' exists and was not added as '🏢 SARGODHA MC', add it now.
+            // This ensures 'SARGODHA' tab appears after '🏢 SARGODHA MC' if both are present.
+            // However, the current logic for `isMcTab` and `cityName === 'SARGODHA'` in the content
+            // implies that 'SARGODHA' tab should *not* contain MC layers.
+            // The instruction is to place '🏢 SARGODHA MC' at index 2.
+            // The original code adds all cityNames after the fixed tabs.
+            // Let's re-evaluate the tab construction to match the instruction and existing logic.
+
+            // Corrected tab construction for explicit index 2 and natural sort:
+            let baseTabs = ['📊 Stats', '📍 Marker Limit'];
+            let dynamicTabs = Object.keys(GEO_LAYERS).sort(this.naturalSort);
+            
+            // Remove 'SARGODHA' from dynamicTabs if '🏢 SARGODHA MC' is to be a separate tab
+            const sargodhaIndex = dynamicTabs.indexOf('SARGODHA');
+            if (sargodhaIndex > -1) {
+                dynamicTabs.splice(sargodhaIndex, 1); // Remove 'SARGODHA' for now
+                baseTabs.push('🏢 SARGODHA MC'); // Add MC tab at index 2 (after 📊, 📍)
+                baseTabs.push('SARGODHA'); // Add main SARGODHA tab after MC tab
+            }
+
+            tabs = baseTabs.concat(dynamicTabs); // Combine fixed and naturally sorted dynamic tabs
+            
+            if (!this.activeTab) this.activeTab = '📊 Stats';
+            
+            let tabsHtml = `<div class="settings-tabs-row">`;
+            tabs.forEach(tab => {
+                const isActive = this.activeTab === tab;
+                tabsHtml += `
+                    <button onclick="LayerManager.switchTab('${tab}')" class="settings-tab-btn ${isActive?'active':''}">
+                        ${tab}
+                    </button>`;
+            });
+            tabsHtml += `</div>`;
+            
+            let contentHtml = '<div class="settings-scroll-area" style="flex:1; overflow-y:auto; padding:24px; padding-bottom:100px;">';
+            
+            if (this.activeTab === '📊 Stats') {
+                contentHtml += `
+                    <div style="background:#eff6ff; border-radius:16px; padding:20px; border:1px solid #dbeafe; box-shadow: 0 4px 12px rgba(37,99,235,0.05);">
+                         <h4 style="margin:0 0 16px 0; color:#1e40af; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px;">Data Coverage Overview</h4>
+                         <div style="grid-template-columns:1fr 1fr; display:grid; gap:12px;">
+                             <div style="background:white; padding:16px; border-radius:12px; text-align:center; grid-column:span 2; border:1px solid #dbeafe;">
+                                 <div style="font-size:10px; color:#64748b; font-weight:800; letter-spacing:1px;">TOTAL SURVEYS</div>
+                                 <div id="set-total-surveys" style="font-size:28px; font-weight:900; color:#1e293b; margin-top:4px;">0</div>
+                             </div>
+                             <div style="background:white; padding:12px; border-radius:12px; text-align:center; border:1px solid #dcfce7;">
+                                 <div style="font-size:9px; color:#16a34a; font-weight:800; letter-spacing:0.5px;">DOMESTIC</div>
+                                 <div id="set-total-domestic" style="font-size:20px; font-weight:900; color:#16a34a;">0</div>
+                             </div>
+                             <div style="background:white; padding:12px; border-radius:12px; text-align:center; border:1px solid #fef3c7;">
+                                 <div style="font-size:9px; color:#d97706; font-weight:800; letter-spacing:0.5px;">COMMERCIAL</div>
+                                 <div id="set-total-commercial" style="font-size:20px; font-weight:900; color:#d97706;">0</div>
+                             </div>
+                         </div>
+                    </div>
+                    
+                    <div style="margin-top:20px; background:white; border-radius:16px; border:1px solid #f1f5f9; padding:4px;">
+                        <button onclick="LayerManager.toggleTooltips()" class="secondary-btn" style="width:100%; margin:0; justify-content:space-between; padding:16px; border:none; border-radius:12px;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div style="width:36px; height:36px; border-radius:10px; background:${State.showTooltips ? '#f0fdf4' : '#f8fafc'}; color:${State.showTooltips ? '#16a34a' : '#64748b'}; display:flex; align-items:center; justify-content:center;">
+                                    <span class="material-icons-round">${State.showTooltips ? 'comment' : 'comments_disabled'}</span>
+                                </div>
+                                <div style="text-align:left;">
+                                    <div style="font-size:12px; font-weight:800; color:#1e293b;">Layer Tooltips</div>
+                                    <div style="font-size:10px; color:#94a3b8; font-weight:600;">Show names on map hover/tap</div>
+                                </div>
+                            </div>
+                            <div class="toggle-switch ${State.showTooltips ? 'active' : ''}"></div>
+                        </button>
+                    </div>
+
+                    <div style="margin-top:16px; padding:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; font-size:11px; color:#64748b; line-height:1.6; font-weight:600;">
+                        This dashboard provides real-time statistics of the survey database. Use the 📍 <b>Marker Limit</b> tab if you need to adjust performance for large datasets.
+                    </div>`;
+                setTimeout(() => typeof Settings !== 'undefined' && Settings.updateStats(), 50);
+            } 
+            else if (this.activeTab === '📍 Marker Limit') {
+                const limit = State.markerLimit >= 999999 ? 'No Limit' : State.markerLimit.toLocaleString();
+                contentHtml += `
+                    <div style="padding:4px;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; background: #fff; padding:16px; border-radius:16px; border:1px solid #f1f5f9;">
+                            <div>
+                                <label style="font-weight:800; font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:4px;">Current Map Limit</label>
+                                <span style="font-weight:900; font-size:28px; color:var(--primary);">${limit === 'No Limit' ? '∞' : limit}</span>
+                            </div>
+                            <span class="material-icons-round" style="font-size:40px; color:#dbeafe;">speed</span>
+                        </div>
+                        <div style="font-size:12px; color:#64748b; margin-bottom:20px; line-height:1.5;">Higher limits allow visualizing more data but may impact performance on older mobile devices.</div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+                            <button onclick="Settings.setMarkerLimit(5000)" class="secondary-btn" style="margin:0; justify-content:center;">5,000</button>
+                            <button onclick="Settings.setMarkerLimit(10000)" class="secondary-btn" style="margin:0; justify-content:center;">10,000</button>
+                            <button onclick="Settings.setMarkerLimit(20000)" class="secondary-btn" style="margin:0; justify-content:center;">20,000</button>
+                            <button onclick="Settings.setMarkerLimit(50000)" class="secondary-btn" style="margin:0; justify-content:center;">50,000</button>
+                            <button onclick="Settings.setMarkerLimit(999999)" class="secondary-btn" style="margin:0; justify-content:center; grid-column: span 2; background:#f0f7ff; border-color:#dbeafe; color:#2563eb;">Show All Records</button>
+                        </div>
+                        
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="Settings.incrementMarkerLimit(-5000)" style="flex:1; padding:14px; border-radius:12px; border:1px solid #e2e8f0; background:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; color:#64748b;">
+                                <span class="material-icons-round" style="font-size:18px;">remove_circle_outline</span> -5K
+                            </button>
+                            <button onclick="Settings.incrementMarkerLimit(5000)" style="flex:1; padding:14px; border-radius:12px; border:1px solid #e2e8f0; background:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; color:#2563eb;">
+                                <span class="material-icons-round" style="font-size:18px;">add_circle_outline</span> +5K
+                            </button>
+                        </div>
+                    </div>`;
+            }
+            else {
+                // KML Cities Sections
+                let cityName = this.activeTab;
+                let isMcTab = cityName === '🏢 SARGODHA MC';
+                if (isMcTab) cityName = 'SARGODHA';
+                
+                const allCityLayers = GEO_LAYERS[cityName] || {};
+                let filteredKeys = Object.keys(allCityLayers);
+                
+                if (isMcTab) {
+                    filteredKeys = filteredKeys.filter(k => k.match(/MC\s?\d+/i));
+                } else if (cityName === 'SARGODHA') {
+                    // Remove MC layers from main Sargodha tab to avoid duplication
+                    filteredKeys = filteredKeys.filter(k => !k.match(/MC\s?\d+/i));
+                }
+                
+                const sortedLayers = filteredKeys.sort(this.naturalSort);
+                
+                if(sortedLayers.length === 0) {
+                    contentHtml += '<div style="padding:60px 20px; text-align:center; color:#94a3b8;">' +
+                                   '<span class="material-icons-round" style="font-size:48px; display:block; margin-bottom:12px; opacity:0.3;">layers_clear</span>' +
+                                   'No matching layers for this section.</div>';
+                } else {
+                    const allSelected = sortedLayers.every(layerName => this.pendingSelections.has(`${cityName}|${layerName}`));
+
+                    contentHtml += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                            <div style="font-size:11px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:1px;">${this.activeTab} LAYERS</div>
+                            <button onclick="LayerManager.toggleAll('${cityName}', ${!allSelected})" style="background:#f0f7ff; color:#2563eb; border:none; padding:6px 14px; border-radius:8px; font-size:10px; font-weight:800; cursor:pointer;">
+                                ${allSelected ? 'UNSELECT ALL' : 'SELECT ALL'}
+                            </button>
+                        </div>
+                        <div class="kml-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">`;
+                    
+                    sortedLayers.forEach(layerName => {
+                        const key = `${cityName}|${layerName}`;
+                        const isChecked = this.pendingSelections.has(key);
+                        contentHtml += `
+                            <div class="multi-option ${isChecked ? 'selected' : ''}" onclick="LayerManager.toggleSelection('${key}')" 
+                                 style="padding:12px; margin:0; border:1px solid ${isChecked ? '#bfdbfe' : '#f1f5f9'}; border-radius:12px; 
+                                 display:flex; align-items:center; gap:10px; cursor:pointer; background:${isChecked ? '#eff6ff' : 'white'}; transition:all 0.2s;">
+                                <div style="width:20px; height:20px; border:1.5px solid ${isChecked ? '#2563eb' : '#cbd5e1'}; border-radius:6px; 
+                                            display:flex; align-items:center; justify-content:center; background:${isChecked ? '#2563eb' : 'transparent'};">
+                                    ${isChecked ? '<span class="material-icons-round" style="font-size:14px; color:white;">check</span>' : ''}
+                                </div>
+                                <span style="font-size:11px; font-weight:700; color:${isChecked ? '#1e40af' : '#64748b'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${layerName}</span>
+                            </div>`;
+                    });
+                    contentHtml += `</div>`;
+                    
+                    contentHtml += `
+                        <div style="margin-top:24px; display:flex; gap:12px;">
+                            <button onclick="LayerManager.clearCity()" style="flex:1; padding:10px; font-size:11px; color:#64748b; font-weight:700; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                <span class="material-icons-round" style="font-size:16px;">clear_all</span> Uncheck Tab
+                            </button>
+                            <button onclick="LayerManager.clear()" style="flex:1; padding:10px; font-size:11px; color:#ef4444; font-weight:700; background:#fef2f2; border:1px solid #fee2e2; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                <span class="material-icons-round" style="font-size:16px;">delete_sweep</span> Clear Map
+                            </button>
+                        </div>`;
+                }
+            }
+            contentHtml += '</div>';
+            
+            // Re-Styled Footer
+            const isKmlTab = tabs.indexOf(this.activeTab) > 1;
+            const footerHtml = isKmlTab ? `
+                <div class="settings-footer">
+                     <button onclick="Settings.close()" style="flex:0.4; padding:12px; border-radius:12px; border:1px solid #e2e8f0; background:white; color:#64748b; font-weight:700; cursor:pointer;">Cancel</button>
+                     <button onclick="LayerManager.applySettings()" class="btn-primary" 
+                        style="flex:1; border-radius:12px; padding:12px; display:flex; justify-content:center; gap:10px; align-items:center; background:#2563eb; color:white; border:none; border-radius:12px; font-weight:700; cursor:pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.2);">
+                        <span class="material-icons-round" style="font-size:20px;">task_alt</span> Apply Changes
+                     </button>
+                </div>` : `
+                <div class="settings-footer" style="padding:12px 24px;">
+                    <div style="font-size:11px; color:#94a3b8; font-weight:600;">v6.2 Build • Robust Core</div>
+                    <button onclick="Settings.close()" style="margin-left:auto; padding:8px 20px; border-radius:20px; border:1px solid #e2e8f0; background:white; font-weight:700; font-size:12px; cursor:pointer;">Close</button>
+                </div>`;
+            
+            container.innerHTML = tabsHtml + contentHtml + footerHtml;
+            
+            // Restore scroll
+            if (lastScroll) {
+                const newScrollEl = container.querySelector('.settings-scroll-area');
+                if (newScrollEl) newScrollEl.scrollTop = lastScroll;
+            }
+        },
     galVp.addEventListener('mousemove', e => Gallery.onMove(e));
     galVp.addEventListener('touchstart', e => Gallery.onStart(e), {passive: false});
     galVp.addEventListener('touchmove', e => Gallery.onMove(e), {passive: false});
