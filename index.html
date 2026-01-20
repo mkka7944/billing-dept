@@ -1034,7 +1034,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 19-Jan 04:52 PM 
+                Updated: 20-Jan 10:30 AM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1652,6 +1652,7 @@
         <script>
             // Global Data Placeholders
             window.RAW_DATA = [];
+            window.DATA_CHUNKS_COUNT = 8;
             window.PAID_DATA = [];
             window.HIERARCHY = {};
             window.GEO_LAYERS = {};
@@ -1790,12 +1791,20 @@
                         return await res.json();
                     };
                     
-                    const [rawData, paidData, hierarchyData, geoLayers] = await Promise.all([
-                        fetchJSON('data.json', 'Survey Records'),
+                    const chunkCount = window.DATA_CHUNKS_COUNT || 1;
+                    const dataPromises = [];
+                    for(let i=1; i<=chunkCount; i++) {
+                        dataPromises.push(fetchJSON(`data_part${i}.json`, `Survey Records (Part ${i}/${chunkCount})`));
+                    }
+
+                    const [dataChunks, paidData, hierarchyData, geoLayers] = await Promise.all([
+                        Promise.all(dataPromises),
                         fetchJSON('paid_data.json', 'Payment Data'),
                         fetchJSON('hierarchy.json', 'Locations'),
                         fetchJSON('geo_layers.json', 'Map Layers')
                     ]);
+                    
+                    const rawData = [].concat(...dataChunks);
                     
                     // Decode PII in window.RAW_DATA
                     window.RAW_DATA = rawData.map(r => {
