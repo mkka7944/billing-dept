@@ -1050,7 +1050,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 20-Jan 12:31 PM 
+                Updated: 20-Jan 12:39 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -3823,7 +3823,7 @@
              setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
         },
         
-        renderSettingsUI() {
+        renderSettingsUI_DEPRECATED() {
             const container = document.getElementById('settings-layers-container');
             if (!container) return;
             
@@ -4320,6 +4320,7 @@
                 if (newScrollEl) newScrollEl.scrollTop = lastScroll;
             }
         },
+    };
     galVp.addEventListener('mousemove', e => Gallery.onMove(e));
     galVp.addEventListener('touchstart', e => Gallery.onStart(e), {passive: false});
     galVp.addEventListener('touchmove', e => Gallery.onMove(e), {passive: false});
