@@ -177,9 +177,10 @@
                 // We'll calculate it by trying to load up to 10 parts if needed or just use default
                 // Better approach: Load Parts until 404
                 
+                // Increased robustness: Load up to 20 chunks to ensure all data is covered
+                // The fetch will fail gracefully for non-existent chunks
                 const dataPromises = [];
-                // Hardcoded assumption of max 5 parts for safety
-                for(let i=1; i<=5; i++) {
+                for(let i=1; i<=20; i++) {
                     dataPromises.push(
                         fetch(`data_part${i}.json`).then(r => r.ok ? r.json() : []).catch(()=>[])
                     );
@@ -189,8 +190,8 @@
                 const paidPromise = fetch('paid_data.json').then(r => r.json()).catch(()=>[]);
                 
                 const results = await Promise.all([...dataPromises, paidPromise]);
-                const rawChunks = results.slice(0, 5);
-                window.PAID_DATA = results[5] || [];
+                const rawChunks = results.slice(0, 20);
+                window.PAID_DATA = results[20] || [];
                 
                 // Flatten
                 window.RAW_DATA = [].concat(...rawChunks);
@@ -205,8 +206,10 @@
         }
 
         function findAndRender(sid) {
-            // Find record: Index 0 is ID
-            const record = window.RAW_DATA.find(r => r[0].toString() === sid);
+            // Find record: Index 0 is ID. Ensure strict string comparison.
+            const record = window.RAW_DATA.find(r => String(r[0]).trim() === String(sid).trim());
+            
+            console.log(`Searching for ID: ${sid} | Found: ${record ? 'YES' : 'NO'}`);
             
             if(!record) {
                 showErrorView(`Record #${sid} not found in database.`);
