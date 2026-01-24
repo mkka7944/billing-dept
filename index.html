@@ -1051,7 +1051,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 24-Jan 07:03 PM 
+                Updated: 24-Jan 07:55 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1514,6 +1514,10 @@
                     </select>
                 </div>
                 <div class="dash-filter-item" style="flex:0 0 auto;">
+            <!-- Back Button -->
+            <button onclick="ViewSwitcher.exit()" class="gallery-btn" style="width:40px; height:40px; background:white; border-radius:50%; box-shadow:0 4px 12px rgba(0,0,0,0.1); border:1px solid #e2e8f0; color:#334155; display:flex; align-items:center; justify-content:center;">
+                <span class="material-icons-round" style="font-size:20px;">arrow_back</span>
+            </button>
                     <button onclick="PaidBills.render()" class="apply-btn" style="height:42px; background:#16a34a; border:none; box-shadow:0 4px 12px rgba(22,163,74,0.1); padding:0 20px; border-radius:10px; display:flex; align-items:center; gap:8px;">
                         <span class="material-icons-round" style="font-size:20px;">sync</span>
                         <span style="font-weight:700">Refresh</span>
@@ -2760,6 +2764,11 @@
             // Only auto-close sidebar on mobile
             if(window.innerWidth <= 768) Sidebar.close();
         },
+        exit() {
+            // Aggressive exit: Clear history and go home
+            State.history = []; // Wipe history
+            this.back(); // Use back logic which now defaults to map/dashboard
+        },
         back() {
             // Priority 1: Check History Stack (Multi-level back)
             if (State.history && State.history.length > 0) {
@@ -3441,30 +3450,39 @@
     };
 
     const LocalCam = {
-        handleCapture(input, surveyId) {
+        async handleCapture(input, surveyId) {
             if (input.files && input.files[0]) {
                 const file = input.files[0];
                 const timestamp = Math.floor(Date.now() / 1000);
-                const filename = `${surveyId}_img_${timestamp}.jpg`;
                 
-                // Create Blob URL
-                const blobUrl = URL.createObjectURL(file);
-                
-                // Trigger Download
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Cleanup
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-                
-                // Toast Feedback
-                // Assuming App.showToast exists (from LayerManager usage), otherwise alert
-                if(window.App && App.showToast) App.showToast("Image Saved to Downloads!");
-                else alert("Image Saved: " + filename);
+                try {
+                    // Use DriveSync's compressor for consistency (WebP < 300KB)
+                    const compressedFile = await DriveSync.compressImage(file);
+                    
+                    // Create Filename
+                    const filename = `${surveyId}_img_${timestamp}.webp`;
+                    
+                    // Create Blob URL from compressed file
+                    const blobUrl = URL.createObjectURL(compressedFile);
+                    
+                    // Trigger Download
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Cleanup
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                    
+                    if(window.App && App.showToast) App.showToast("Image Saved: " + filename);
+                    else alert("Image Saved: " + filename);
+                    
+                } catch (e) {
+                    console.error("Compression failed", e);
+                    alert("Error saving image: " + e.message);
+                }
                 
                 // Reset input
                 input.value = '';
@@ -3478,16 +3496,25 @@
         open() {
             document.getElementById('modal-qr').style.display = 'flex';
             
-            // Check if library is loaded (cdn might fail)
             if (typeof Html5Qrcode === 'undefined') {
                 alert("QR Scanner Library failed to load. Please refresh.");
                 return;
             }
 
             this.html5QrCode = new Html5Qrcode("qr-reader");
-            const config = { fps: 10, qrbox: 250 };
             
-            // Prefer back camera
+            // High Performance Config
+            const config = { 
+                fps: 30, // Increased for fluid tracking
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    const size = Math.floor(minEdge * 0.85); // 85% width
+                    return { width: size, height: size };
+                },
+                aspectRatio: 1.0
+            };
+            
+            // Prefer back camera with HD resolution
             this.html5QrCode.start(
                 { facingMode: "environment" }, 
                 config, 
