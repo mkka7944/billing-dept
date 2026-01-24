@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root { 
@@ -1050,7 +1051,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 24-Jan 06:33 PM 
+                Updated: 24-Jan 07:03 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1324,7 +1325,7 @@
                 <button class="float-btn" onclick="Settings.open()" title="Settings">
                     <span class="material-icons-round" style="color:#10b981">settings</span>
                 </button>
-                <button class="float-btn" onclick="window.open('scanner.html?sid=', '_blank')" title="Scanner View">
+                <button class="float-btn" onclick="QRScanner.open()" title="Scan QR Code">
                     <span class="material-icons-round" style="color:#6366f1">qr_code_scanner</span>
                 </button>
                 <button class="float-btn" onclick="Sidebar.toggle()" title="Menu">
@@ -1627,6 +1628,19 @@
             </div>
         </div>
         <div id="log-body" class="stats-table-container" style="flex:1; overflow-y:auto; padding:0;"></div>
+    </div>
+</div>
+
+<!-- QR Scanner Modal -->
+<div id="modal-qr" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:12000; flex-direction:column; align-items:center; justify-content:center;">
+    <div style="position:absolute; top:20px; right:20px; z-index:12001;">
+        <button onclick="QRScanner.close()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+            <span class="material-icons-round" style="font-size:32px">close</span>
+        </button>
+    </div>
+    <div style="width:100%; max-width:500px; padding:20px;">
+        <div id="qr-reader" style="width:100%; border-radius:16px; overflow:hidden; border:2px solid rgba(255,255,255,0.3);"></div>
+        <div style="text-align:center; color:white; margin-top:20px; font-weight:600;">Point camera at Survey ID QR Code</div>
     </div>
 </div>
 
@@ -2947,14 +2961,14 @@
                     <input type="file" id="local-cam-input" accept="image/*" capture="environment" style="display:none" onchange="LocalCam.handleCapture(this, '${r[0]}')">
                     
                     <div class="sync-action-grid">
-                        <button onclick="document.getElementById('drive-input-camera').click()" class="sync-action-btn camera">
-                            <span class="material-icons-round">photo_camera</span> Camera
-                        </button>
-                        <button onclick="document.getElementById('drive-input-gallery').click()" class="sync-action-btn gallery">
-                            <span class="material-icons-round">photo_library</span> Gallery
-                        </button>
                         <button onclick="document.getElementById('local-cam-input').click()" class="sync-action-btn" style="grid-column:span 2; background:#6366f1; color:white; border:none; box-shadow:0 4px 12px rgba(99,102,241,0.2);">
                             <span class="material-icons-round">camera_enhance</span> Local Camera (Save to Phone)
+                        </button>
+                        <button onclick="document.getElementById('drive-input-camera').click()" class="sync-action-btn camera">
+                            <span class="material-icons-round">photo_camera</span> Camera (Drive)
+                        </button>
+                        <button onclick="document.getElementById('drive-input-gallery').click()" class="sync-action-btn gallery">
+                            <span class="material-icons-round">photo_library</span> Gallery Save
                         </button>
                         <button id="btn-sync-drive" onclick="DriveSync.upload('${r[0]}')" class="sync-action-btn upload">
                             <span class="material-icons-round">cloud_upload</span> Sync Now
@@ -3454,6 +3468,76 @@
                 
                 // Reset input
                 input.value = '';
+            }
+        }
+    };
+
+    const QRScanner = {
+        html5QrCode: null,
+        
+        open() {
+            document.getElementById('modal-qr').style.display = 'flex';
+            
+            // Check if library is loaded (cdn might fail)
+            if (typeof Html5Qrcode === 'undefined') {
+                alert("QR Scanner Library failed to load. Please refresh.");
+                return;
+            }
+
+            this.html5QrCode = new Html5Qrcode("qr-reader");
+            const config = { fps: 10, qrbox: 250 };
+            
+            // Prefer back camera
+            this.html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                (decodedText) => this.onScanSuccess(decodedText),
+                (errorMessage) => { /* ignore per-frame errors */ }
+            ).catch(err => {
+                console.error("Camera start failed", err);
+                alert("Could not start camera: " + err);
+                this.close();
+            });
+        },
+        
+        onScanSuccess(decodedText) {
+            console.log(`Scan matched: ${decodedText}`);
+            this.close();
+            
+            // Handle URL or simple ID
+            // URLs might be like: https://mkka7944.github.io/billing-dept/scanner.html?sid=12345
+            let id = decodedText;
+            
+            if (decodedText.includes('sid=')) {
+                try {
+                    const url = new URL(decodedText);
+                    id = url.searchParams.get('sid');
+                } catch(e) {
+                    // Fallback regex if URL parsing fails
+                    const match = decodedText.match(/sid=([^&]+)/);
+                    if (match) id = match[1];
+                }
+            }
+            
+            if (id) {
+                // Remove any non-alphanumeric except underscore/hyphen if needed, 
+                // but survey IDs are usually numbers.
+                ListView.jumpFromMap(id);
+            } else {
+                alert("Could not parse Survey ID from: " + decodedText);
+            }
+        },
+        
+        close() {
+            if (this.html5QrCode && this.html5QrCode.isScanning) {
+                this.html5QrCode.stop().then(() => {
+                    this.html5QrCode.clear();
+                    document.getElementById('modal-qr').style.display = 'none';
+                }).catch(err => {
+                    document.getElementById('modal-qr').style.display = 'none';
+                });
+            } else {
+                document.getElementById('modal-qr').style.display = 'none';
             }
         }
     };
