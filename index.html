@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root { 
@@ -1051,7 +1052,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 24-Jan 07:55 PM 
+                Updated: 24-Jan 09:38 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1310,7 +1311,7 @@
                 <button class="float-btn" onclick="ViewSwitcher.toList()" title="List View">
                     <span class="material-icons-round" style="color:#06b6d4">view_list</span>
                 </button>
-                <button class="float-btn" onclick="UniversalSearch.open()" title="Universal Search" style="background:var(--primary); color:white;">
+                <button onclick="UniversalSearch.open()" title="Universal Search" style="background:var(--primary); color:white;">
                     <span class="material-icons-round">search</span>
                 </button>
                 <button class="float-btn" onclick="App.toggleLayer()" title="Toggle Satellite">
@@ -1645,6 +1646,67 @@
     <div style="width:100%; max-width:500px; padding:20px;">
         <div id="qr-reader" style="width:100%; border-radius:16px; overflow:hidden; border:2px solid rgba(255,255,255,0.3);"></div>
         <div style="text-align:center; color:white; margin-top:20px; font-weight:600;">Point camera at Survey ID QR Code</div>
+    </div>
+</div>
+
+<!-- Coordinate Comparison Modal -->
+<div id="modal-coordinate-comparison" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:12000; flex-direction:column; align-items:center; justify-content:center;">
+    <div style="position:absolute; top:20px; right:20px; z-index:12001;">
+        <button onclick="CoordinateExtractor.closeComparison()" style="background:rgba(255,255,255,0.2); border:none; color:white; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+            <span class="material-icons-round" style="font-size:32px">close</span>
+        </button>
+    </div>
+    <div style="background:white; border-radius:16px; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; padding:24px;">
+        <h3 style="margin:0 0 20px 0; color:#1e293b; display:flex; align-items:center; gap:12px;">
+            <span class="material-icons-round" style="color:#f59e0b; font-size:28px;">gps_fixed</span>
+            Coordinate Comparison
+        </h3>
+        
+        <div id="coordinate-loading" style="text-align:center; padding:40px; color:#64748b; display:none;">
+            <div style="font-size:48px; margin-bottom:16px;">⏳</div>
+            <div>Extracting coordinates from portal image...</div>
+        </div>
+        
+        <div id="coordinate-error" style="text-align:center; padding:40px; color:#ef4444; display:none;">
+            <div style="font-size:48px; margin-bottom:16px;">❌</div>
+            <div id="error-message">Failed to extract coordinates</div>
+        </div>
+        
+        <div id="coordinate-results" style="display:none;">
+            <div class="coord-comparison-section" style="margin-bottom:20px;">
+                <h4 style="margin:0 0 12px 0; color:#374151; font-size:14px; font-weight:600;">ORIGINAL PORTAL COORDINATES</h4>
+                <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:4px solid #3b82f6;">
+                    <div id="original-coords" style="font-family:monospace; font-size:14px; color:#1e40af;">Loading...</div>
+                    <div id="original-source" style="font-size:12px; color:#64748b; margin-top:4px;">Source: Portal Database</div>
+                </div>
+            </div>
+            
+            <div class="coord-comparison-section" style="margin-bottom:20px;">
+                <h4 style="margin:0 0 12px 0; color:#374151; font-size:14px; font-weight:600;">IMAGE EXTRACTED COORDINATES</h4>
+                <div style="background:#fef3c7; padding:12px; border-radius:8px; border-left:4px solid #f59e0b;">
+                    <div id="image-coords" style="font-family:monospace; font-size:14px; color:#92400e;">Loading...</div>
+                    <div id="image-datetime" style="font-size:12px; color:#64748b; margin-top:4px;">Loading...</div>
+                </div>
+            </div>
+            
+            <div class="coord-comparison-section" style="margin-bottom:20px;">
+                <h4 style="margin:0 0 12px 0; color:#374151; font-size:14px; font-weight:600;">DISTANCE DIFFERENCE</h4>
+                <div id="distance-analysis" style="background:#f0f9ff; padding:12px; border-radius:8px; border-left:4px solid #0ea5e9;">
+                    <div id="distance-value" style="font-size:16px; font-weight:600; color:#0c4a6e;">Calculating...</div>
+                    <div id="distance-accuracy" style="font-size:12px; color:#64748b; margin-top:4px;">Loading...</div>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:12px; margin-top:24px;">
+                <button onclick="CoordinateExtractor.showOnMap()" style="flex:1; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span class="material-icons-round" style="font-size:20px;">map</span>
+                    Show on Map
+                </button>
+                <button onclick="CoordinateExtractor.closeComparison()" style="flex:1; background:#f1f5f9; color:#64748b; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">
+                    Close
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -2979,6 +3041,9 @@
                         <button onclick="document.getElementById('drive-input-gallery').click()" class="sync-action-btn gallery">
                             <span class="material-icons-round">photo_library</span> Gallery Save
                         </button>
+                        <button onclick="CoordinateExtractor.extractFromPortalImage('${r[0]}')" class="sync-action-btn" style="background:#f59e0b; color:white;">
+                            <span class="material-icons-round">gps_fixed</span> Extract GPS
+                        </button>
                         <button id="btn-sync-drive" onclick="DriveSync.upload('${r[0]}')" class="sync-action-btn upload">
                             <span class="material-icons-round">cloud_upload</span> Sync Now
                         </button>
@@ -3869,6 +3934,297 @@
                 reader.onload = () => resolve(reader.result.split(',')[1]);
                 reader.onerror = error => reject(error);
             });
+        }
+    };
+
+    const CoordinateExtractor = {
+        currentSurveyId: null,
+        originalCoords: null,
+        imageCoords: null,
+        
+        extractFromPortalImage(surveyId) {
+            this.currentSurveyId = surveyId;
+            
+            // Get original coordinates
+            const record = State.filtered.find(r => r[0] == surveyId);
+            if (!record || !record[1] || !record[2]) {
+                alert('No coordinates found for this survey');
+                return;
+            }
+            
+            this.originalCoords = {
+                latitude: parseFloat(record[1]),
+                longitude: parseFloat(record[2])
+            };
+            
+            // Find the first image in the list view
+            const firstImage = this.findFirstPortalImage(surveyId);
+            if (!firstImage) {
+                alert('No portal images found for this survey');
+                return;
+            }
+            
+            // Show loading and process with OCR
+            this.showLoading();
+            this.processImageWithOCR(firstImage);
+        },
+        
+        findFirstPortalImage(surveyId) {
+            // Look for images in the current list view card
+            const listContent = document.getElementById('lv-content');
+            if (!listContent) return null;
+            
+            // Find all images in the current list view
+            const images = listContent.querySelectorAll('img');
+            if (images.length === 0) return null;
+            
+            // Return the first image
+            return images[0];
+        },
+        
+        showLoading() {
+            const loadingHtml = `
+                <div id="ocr-loading-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:12000; display:flex; align-items:center; justify-content:center; padding:20px;">
+                    <div style="background:white; border-radius:16px; padding:24px; text-align:center; max-width:400px;">
+                        <div style="font-size:48px; margin-bottom:16px;">⏳</div>
+                        <div style="font-weight:600; color:#1e293b; margin-bottom:8px;">Extracting Coordinates...</div>
+                        <div style="color:#64748b; font-size:14px;">Processing portal image with OCR</div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', loadingHtml);
+        },
+        
+        hideLoading() {
+            const modal = document.getElementById('ocr-loading-modal');
+            if (modal) modal.remove();
+        },
+        
+        async processImageWithOCR(imageElement) {
+            try {
+                // Create a canvas to get the image data
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size to match image
+                canvas.width = imageElement.naturalWidth;
+                canvas.height = imageElement.naturalHeight;
+                
+                // Draw image to canvas
+                ctx.drawImage(imageElement, 0, 0);
+                
+                // Crop to top-left corner (where coordinates are displayed)
+                // Assuming coordinates are in top-left 25% of image
+                const cropWidth = Math.floor(canvas.width * 0.4);
+                const cropHeight = Math.floor(canvas.height * 0.2);
+                
+                const croppedCanvas = document.createElement('canvas');
+                const croppedCtx = croppedCanvas.getContext('2d');
+                croppedCanvas.width = cropWidth;
+                croppedCanvas.height = cropHeight;
+                
+                // Copy the top-left corner
+                croppedCtx.drawImage(canvas, 0, 0, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+                
+                // Get image data for OCR
+                const imageData = croppedCanvas.toDataURL('image/png');
+                
+                // Run OCR using Tesseract.js
+                const result = await Tesseract.recognize(
+                    imageData,
+                    'eng',
+                    {
+                        logger: m => console.log(m) // Optional: log progress
+                    }
+                );
+                
+                // Extract coordinates from OCR text
+                const coordinates = this.parseCoordinatesFromText(result.data.text);
+                
+                if (coordinates) {
+                    this.imageCoords = coordinates;
+                    this.hideLoading();
+                    this.showResults();
+                } else {
+                    this.hideLoading();
+                    alert('Could not extract coordinates from the image. Please ensure coordinates are visible in the top-left corner.');
+                }
+                
+            } catch (error) {
+                console.error('OCR processing failed:', error);
+                this.hideLoading();
+                alert('Failed to process image with OCR. Please try again.');
+            }
+        },
+        
+        parseCoordinatesFromText(text) {
+            // Pattern to match coordinates like "32.0677222, 72.7019085"
+            const coordPattern = /(-?\d{1,3}\.\d{6,8})\s*,\s*(-?\d{1,3}\.\d{6,8})/g;
+            const matches = text.match(coordPattern);
+            
+            if (matches && matches.length > 0) {
+                const coords = matches[0].match(/(-?\d{1,3}\.\d{6,8})\s*,\s*(-?\d{1,3}\.\d{6,8})/);
+                if (coords) {
+                    const lat = parseFloat(coords[1]);
+                    const lng = parseFloat(coords[2]);
+                    
+                    // Validate coordinate ranges
+                    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                        return {
+                            latitude: lat,
+                            longitude: lng,
+                            datetime: new Date().toLocaleString(),
+                            confidence: 0.8,
+                            source: 'portal_image_ocr'
+                        };
+                    }
+                }
+            }
+            
+            return null;
+        },
+        
+        showResults() {
+            // Calculate distance
+            const distance = this.calculateDistance(this.originalCoords, this.imageCoords);
+            
+            let accuracy = '';
+            if (distance.meters < 10) {
+                accuracy = '🎯 Excellent (within 10 meters)';
+            } else if (distance.meters < 50) {
+                accuracy = '✅ Good (within 50 meters)';
+            } else if (distance.meters < 100) {
+                accuracy = '⚠️ Moderate (within 100 meters)';
+            } else {
+                accuracy = '❌ Poor (more than 100 meters)';
+            }
+            
+            // Show results modal
+            const resultsHtml = `
+                <div id="coords-results-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:12000; display:flex; align-items:center; justify-content:center; padding:20px;">
+                    <div style="background:white; border-radius:16px; max-width:500px; width:100%; padding:24px;">
+                        <h3 style="margin:0 0 16px 0; color:#1e293b; display:flex; align-items:center; gap:12px;">
+                            <span class="material-icons-round" style="color:#10b981; font-size:28px;">compare_arrows</span>
+                            Coordinate Comparison Results
+                        </h3>
+                        
+                        <div style="margin-bottom:16px;">
+                            <h4 style="margin:0 0 8px 0; color:#374151; font-size:14px;">Original Portal Coordinates:</h4>
+                            <div style="background:#f8fafc; padding:12px; border-radius:8px; border-left:4px solid #3b82f6; font-family:monospace; font-size:14px;">
+                                ${this.originalCoords.latitude.toFixed(7)}, ${this.originalCoords.longitude.toFixed(7)}
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom:16px;">
+                            <h4 style="margin:0 0 8px 0; color:#374151; font-size:14px;">Image Extracted Coordinates:</h4>
+                            <div style="background:#fef3c7; padding:12px; border-radius:8px; border-left:4px solid #f59e0b; font-family:monospace; font-size:14px;">
+                                ${this.imageCoords.latitude.toFixed(7)}, ${this.imageCoords.longitude.toFixed(7)}
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom:20px;">
+                            <h4 style="margin:0 0 8px 0; color:#374151; font-size:14px;">Distance Analysis:</h4>
+                            <div style="background:#f0f9ff; padding:12px; border-radius:8px; border-left:4px solid #0ea5e9;">
+                                <div style="font-size:18px; font-weight:600; color:#0c4a6e;">${distance.meters} meters (${distance.kilometers} km)</div>
+                                <div style="font-size:14px; color:#64748b; margin-top:4px;">${accuracy}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="display:flex; gap:12px;">
+                            <button onclick="CoordinateExtractor.showOnMap()" style="flex:1; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">
+                                🗺️ Show on Map
+                            </button>
+                            <button onclick="CoordinateExtractor.closeResultsModal()" style="flex:1; background:#f1f5f9; color:#64748b; border:none; padding:12px; border-radius:8px; font-weight:600; cursor:pointer;">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', resultsHtml);
+        },
+        
+        showOnMap() {
+            if (!this.originalCoords || !this.imageCoords) return;
+            
+            // Switch to map view
+            ViewSwitcher.toMap();
+            
+            // Clear existing comparison markers
+            if (window.comparisonMarkers) {
+                window.comparisonMarkers.forEach(marker => State.map.removeLayer(marker));
+            }
+            window.comparisonMarkers = [];
+            
+            // Add original marker (blue)
+            const originalMarker = L.marker([this.originalCoords.latitude, this.originalCoords.longitude], {
+                icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: "<div style='background-color:#3b82f6; width:12px; height:12px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'></div>",
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                })
+            }).addTo(State.map);
+            originalMarker.bindPopup(`<b>Original Portal Coordinates</b><br>${this.originalCoords.latitude.toFixed(7)}, ${this.originalCoords.longitude.toFixed(7)}`);
+            window.comparisonMarkers.push(originalMarker);
+            
+            // Add image coordinates marker (orange)
+            const imageMarker = L.marker([this.imageCoords.latitude, this.imageCoords.longitude], {
+                icon: L.divIcon({
+                    className: 'custom-div-icon',
+                    html: "<div style='background-color:#f59e0b; width:12px; height:12px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);'></div>",
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                })
+            }).addTo(State.map);
+            imageMarker.bindPopup(`<b>Portal Image Coordinates</b><br>${this.imageCoords.latitude.toFixed(7)}, ${this.imageCoords.longitude.toFixed(7)}<br><small>Extracted via OCR</small>`);
+            window.comparisonMarkers.push(imageMarker);
+            
+            // Add connection line
+            const connectionLine = L.polyline([
+                [this.originalCoords.latitude, this.originalCoords.longitude],
+                [this.imageCoords.latitude, this.imageCoords.longitude]
+            ], {
+                color: '#ef4444',
+                weight: 2,
+                dashArray: '5, 10',
+                opacity: 0.8
+            }).addTo(State.map);
+            window.comparisonMarkers.push(connectionLine);
+            
+            // Fit map to show both markers
+            const bounds = L.latLngBounds([
+                [this.originalCoords.latitude, this.originalCoords.longitude],
+                [this.imageCoords.latitude, this.imageCoords.longitude]
+            ]);
+            State.map.fitBounds(bounds, { padding: [50, 50] });
+            
+            // Close modal
+            this.closeResultsModal();
+        },
+        
+        calculateDistance(coords1, coords2) {
+            const R = 6371000; // Earth's radius in meters
+            const lat1 = coords1.latitude * Math.PI / 180;
+            const lat2 = coords2.latitude * Math.PI / 180;
+            const deltaLat = (coords2.latitude - coords1.latitude) * Math.PI / 180;
+            const deltaLon = (coords2.longitude - coords1.longitude) * Math.PI / 180;
+            
+            const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
+                     Math.cos(lat1) * Math.cos(lat2) *
+                     Math.sin(deltaLon/2) * Math.sin(deltaLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return {
+                meters: Math.round(R * c * 100) / 100,
+                kilometers: Math.round(R * c / 10) / 10000
+            };
+        },
+        
+        closeResultsModal() {
+            const modal = document.getElementById('coords-results-modal');
+            if (modal) modal.remove();
         }
     };
 
@@ -5185,6 +5541,7 @@
     window.Settings = Settings;
     window.Gallery = Gallery;
     window.DriveSync = DriveSync;
+    window.CoordinateExtractor = CoordinateExtractor;
     window.LayerManager = LayerManager || {};
     window.ViewSwitcher = ViewSwitcher;
     window.ListView = ListView;
