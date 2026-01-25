@@ -9,8 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <style>
-        :root { 
+    <style>:root { 
             --primary: #2563eb; --warning: #f59e0b; --danger: #ef4444; --text: #1e293b; --bg: #f8fafc; 
             --sidebar-w: 320px; --sidebar-collapsed-w: 0px;
             --spacer: 16px; --spacer-lg: 24px;
@@ -308,27 +307,11 @@
         .status-warn { background: #fef3c7; color: #92400e; }
         .status-ok { background: #f0fdf4; color: #166534; }
 
-        /* Map Interactive Focus Fix */
-        path.leaflet-interactive:focus { outline: none !important; }
-
-        /* Modern Tooltip Optimized */
-        .leaflet-tooltip { 
-            background: rgba(255, 255, 255, 0.95); 
-            border: 1px solid #e2e8f0; 
-            border-radius: 6px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-            font-size: 11px; 
-            font-weight: 700; 
-            color: #1e293b; 
-            padding: 4px 8px;
-            white-space: nowrap;
-        }
-        .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { border: none !important; }
-
-        /* Settings Modal Desktop Size */
-        @media (min-width: 769px) {
-            #modal-settings .modal-content { max-width: 800px !important; height: 700px !important; }
-        }
+        /* Modern Tooltip */
+        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; }
+        .leaflet-popup-content { margin: 0; width: 220px !important; }
+        .pop-card { padding: 12px; }
+        .pop-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--primary); }
 
         /* Advanced Gallery */
         .gallery-overlay { 
@@ -550,7 +533,7 @@
         }
         
         .sync-action-btn {
-            height: 48px; border-radius: 14px; border: none;
+            height: 52px; border-radius: 14px; border: none;
             display: flex; align-items: center; justify-content: center; gap: 8px;
             font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s;
         }
@@ -558,14 +541,8 @@
             background: white; color: var(--primary); border: 2px solid var(--primary);
         }
         .sync-action-btn.camera:hover { background: #f0f7ff; }
-
-        .sync-action-btn.gallery {
-            background: #f8fafc; color: #64748b; border: 2px solid #e2e8f0;
-        }
-        .sync-action-btn.gallery:hover { background: #f1f5f9; border-color: #cbd5e1; }
         
         .sync-action-btn.upload {
-            grid-column: span 2;
             background: #10b981; color: white; border: none;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
         }
@@ -1011,8 +988,7 @@
         .search-item-title { font-weight: 800; color: #1e293b; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .search-item-sub { font-size: 11px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .search-item-meta { font-size: 10px; font-weight: 800; color: var(--primary); background: #eff6ff; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; }
-        .search-badge { padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 800; background: #f1f5f9; color: #475569; text-transform: uppercase; }
-        </style>
+        .search-badge { padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 800; background: #f1f5f9; color: #475569; text-transform: uppercase; }</style>
 </head>
 <body>
     <div id="login-overlay" style="position:fixed; inset:0; background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%); z-index:999999; display:flex; align-items:center; justify-content:center; padding:20px; transition: opacity 0.5s ease;">
@@ -1050,7 +1026,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 25-Jan 05:09 PM 
+                Updated: 25-Jan 05:15 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1863,7 +1839,3013 @@
 
 <script>
     
-    {{JS_LOGIC}}
+    // Safety check for injected data
+if (typeof GEO_LAYERS === 'undefined') window.GEO_LAYERS = {};
+if (typeof RAW_DATA === 'undefined') window.RAW_DATA = [];
+if (typeof PAID_DATA === 'undefined') window.PAID_DATA = [];
+if (typeof HIERARCHY === 'undefined') window.HIERARCHY = {};
+
+const State = {
+    filtered: [],
+    availableSurveyors: [],
+    surveyorFilter: [],
+    markers: L.layerGroup(),
+    currentIdx: 0,
+    map: null,
+    markerLimit: 999999,
+    payColorMode: false,
+    syncedData: {}, // { surveyId: latestTimestamp }
+    driveOnlyFilter: false,
+    originView: 'map', // Track origin for navigation (map, dashboard)
+    quickFilters: { domestic: true, commercial: true },
+    lastHighlightedSurveyor: null
+};
+
+const Utils = {
+    getDistance(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+        const R = 6371e3; // metres
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c; // in metres
+    }
+};
+
+const App = {
+    toggleQuickFilter(key, e) {
+        if (e && e.target.tagName === 'INPUT') return; // Handled by change listener potentially, but better to unify here
+        State.quickFilters[key] = !State.quickFilters[key];
+        const checkbox = document.getElementById(`q-${key}`);
+        if (checkbox) {
+            checkbox.checked = State.quickFilters[key];
+            checkbox.closest('.multi-option').classList.toggle('selected', State.quickFilters[key]);
+        }
+        this.apply();
+    },
+
+    updateSidebarStatus() {
+        // Update selection counts (balloons) in filter headers
+        const updates = [
+            { id: 'f-dist', badgeId: 'badge-f-dist' },
+            { id: 'f-tehsil', badgeId: 'badge-f-tehsil' },
+            { id: 'f-mc', badgeId: 'badge-f-mc' },
+            { id: 'f-pay', badgeId: 'badge-f-pay' },
+            { id: 'f-surveyor', badgeId: 'badge-f-surveyor' },
+            { id: 'f-quick', badgeId: 'badge-f-quick' },
+            { id: 'f-drive', badgeId: 'badge-f-drive' }
+        ];
+
+        updates.forEach(upd => {
+            const badge = document.getElementById(upd.badgeId);
+            if (!badge) return;
+
+            let selected = 0;
+            let total = 0;
+
+            if (upd.id === 'f-quick') {
+                selected = Object.values(State.quickFilters).filter(v => v).length;
+                total = Object.values(State.quickFilters).length;
+            } else if (upd.id === 'f-drive') {
+                selected = document.getElementById('f-drive-only').checked ? 1 : 0;
+                total = 1;
+            } else {
+                selected = this.getSelected(upd.id).length;
+                total = this.getMultiSelectItems(upd.id).length;
+            }
+
+            if (upd.id === 'f-quick') {
+                const active = [];
+                if (State.quickFilters.domestic) active.push('Dom');
+                if (State.quickFilters.commercial) active.push('Com');
+
+                if (active.length === 2) {
+                    badge.innerText = 'All';
+                    badge.style.display = 'inline-block';
+                } else if (active.length === 1) {
+                    badge.innerText = active[0];
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+                return;
+            }
+
+            if (selected > 0 && selected < total) {
+                badge.innerText = selected;
+                badge.style.display = 'inline-flex';
+                badge.style.background = '#eff6ff';
+                badge.style.color = '#2563eb';
+                badge.style.borderColor = '#dbeafe';
+            } else if (selected === total && total > 0) {
+                badge.innerText = 'All';
+                badge.style.display = 'inline-flex';
+                badge.style.background = '#edfcf2';
+                badge.style.color = '#059669';
+                badge.style.borderColor = '#bbf7d0';
+            } else {
+                badge.style.display = 'none';
+            }
+        });
+
+        // Update Paid History Count
+        const paidBadge = document.getElementById('badge-paid-count');
+        if (paidBadge && typeof PAID_DATA !== 'undefined') {
+            const count = Object.keys(PAID_DATA).length;
+            if (count > 0) {
+                paidBadge.innerText = count;
+                paidBadge.style.display = 'inline-flex';
+            } else {
+                paidBadge.style.display = 'none';
+            }
+        }
+    },
+
+    init() {
+        this.initMap();
+        this.initFilters();
+        Sidebar.init();
+        InfoCard.init();
+        if (typeof UniversalSearch !== 'undefined') UniversalSearch.init();
+        this.resetFilters(); // Initial load (Zero markers + Cantonment KML)
+
+        // Live Zoom Updates
+        State.map.on('zoomend', () => {
+            const el = document.getElementById('zoom-level-text');
+            if (el) el.innerText = `Z: ${State.map.getZoom()}`;
+        });
+        // Initial call
+        const el = document.getElementById('zoom-level-text');
+        if (el) el.innerText = `Z: ${State.map.getZoom()}`;
+
+        // Handle URL Params (QR Code Link)
+        setTimeout(() => this.handleUrlParams(), 1000);
+
+        // Background Fetch Synced Data
+        setTimeout(() => DriveSync.fetchAllSyncedData(), 2000);
+    },
+
+    handleUrlParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sid = urlParams.get('sid');
+        if (sid) {
+            console.log("Found Survey ID in URL:", sid);
+
+            // FORCE RESET FILTERS TO "ALL"
+            // This ensures we search looking at the entire dataset, not just the default view.
+
+            // 1. Select All Districts, Tehsils, MCs
+            App.toggleAll('f-dist', true);
+            App.toggleAll('f-tehsil', true);
+            App.toggleAll('f-mc', true);
+
+            // 2. Clear Date Filters
+            this.clearDates();
+
+            // 3. Apply to update State.filtered
+            this.apply();
+
+            // Switch to List View
+            ViewSwitcher.toList();
+
+            // Wait for List to Populate (now with FULL data)
+            setTimeout(() => {
+                const searchInput = document.getElementById('lv-search');
+                if (searchInput) {
+                    searchInput.value = sid;
+                    ListView.render(); // This filters State.filtered by the search term
+
+                    // Auto-select first result if exact match
+                    setTimeout(() => {
+                        if (State.filtered.length > 0) {
+                            // Find record that exactly matches ID if possible
+                            const record = State.filtered.find(r => r[0].toString() === sid) || State.filtered[0];
+
+                            if (record) {
+                                ViewSwitcher.toMap();
+                                State.map.flyTo([record[1], record[2]], 19);
+
+                                // Open Popup
+                                setTimeout(() => {
+                                    State.markers.eachLayer(layer => {
+                                        if (layer.options.id === sid.toString()) {
+                                            layer.openPopup();
+                                        }
+                                    });
+                                }, 800);
+                            }
+                        }
+                    }, 200);
+                }
+            }, 800);
+        }
+    },
+
+    resetFilters() {
+        State.surveyorFilter = [];
+        if (State.fpStart) State.fpStart.clear();
+        if (State.fpEnd) State.fpEnd.clear();
+
+        // Uncheck All for Payment status
+        this.toggleAll('f-pay', false);
+
+        // Reset quick filters to active
+        State.quickFilters = { urban: true, rural: true, domestic: true, commercial: true };
+        ['urban', 'rural', 'domestic', 'commercial'].forEach(key => {
+            const cb = document.getElementById(`q-${key}`);
+            if (cb) {
+                cb.checked = true;
+                cb.parentElement.classList.add('selected');
+            }
+        });
+
+        // Standard reset: Re-initialize to defaults (Sargodha City / Cantonment)
+        this.initFilters();
+
+        // NO MARKERS LOADED (as requested)
+        State.markers.clearLayers();
+        State.filtered = [];
+        const countEl = document.getElementById('stat-count');
+        if (countEl) countEl.innerText = "0 / " + RAW_DATA.length;
+
+        // AUTO-ENABLE CANTONOMENT KML (as requested)
+        if (typeof LayerManager !== 'undefined' && typeof GEO_LAYERS !== 'undefined') {
+            const cantonmentKeys = [];
+            for (let city in GEO_LAYERS) {
+                for (let layerName in GEO_LAYERS[city]) {
+                    if (layerName.toUpperCase().includes('CANTONMENT')) {
+                        cantonmentKeys.push(`${city}|${layerName}`);
+                    }
+                }
+            }
+            if (cantonmentKeys.length > 0) {
+                LayerManager.load(cantonmentKeys);
+            }
+        }
+    },
+
+    setToday() {
+        const today = new Date();
+        if (State.fpStart) State.fpStart.setDate(today, true);
+        if (State.fpEnd) State.fpEnd.setDate(today, true);
+        // apply is triggered by onChange in flatpickr, but just in case:
+        this.apply();
+    },
+
+    clearDates() {
+        if (State.fpStart) State.fpStart.clear();
+        if (State.fpEnd) State.fpEnd.clear();
+        this.apply();
+    },
+
+    initMap() {
+        State.map = L.map('map', {
+            zoomControl: false,
+            preferCanvas: false,
+            zoomAnimation: true,
+            fadeAnimation: true,
+            markerZoomAnimation: true,
+            inertia: true,
+            inertiaDeceleration: 3000,
+            updateWhenIdle: true
+        }).setView([32.0836, 72.6711], 13);
+
+        // Create a dedicated pane for KML layers to keep them below markers
+        State.map.createPane('kmlPane');
+        State.map.getPane('kmlPane').style.zIndex = 350;
+
+        State.layers = {
+            roads: L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                keepBuffer: 6,
+                updateWhenIdle: true
+            }),
+            sat: L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                keepBuffer: 6,
+                updateWhenIdle: true
+            })
+        };
+
+        State.layers.roads.addTo(State.map);
+        State.activeLayer = 'roads';
+        State.markers.addTo(State.map);
+    },
+
+    toggleLayer() {
+        const isRoads = State.activeLayer === 'roads';
+        State.map.removeLayer(State.layers[State.activeLayer]);
+        State.activeLayer = isRoads ? 'sat' : 'roads';
+        State.layers[State.activeLayer].addTo(State.map);
+
+        document.getElementById('layer-icon').innerText = isRoads ? 'map' : 'satellite_alt';
+    },
+
+    toggleControls() {
+        const grp = document.getElementById('extra-ctrls');
+        const btn = document.getElementById('toggle-ctrls').querySelector('.material-icons-round');
+        const isCollapsed = grp.classList.toggle('collapsed');
+        btn.innerText = isCollapsed ? 'keyboard_arrow_up' : 'keyboard_arrow_down';
+    },
+
+    toggleFilterGroup(el) {
+        const group = el.closest('.filter-group');
+        const isCollapsing = !group.classList.contains('collapsed');
+
+        // Accordion: Collapse all others
+        document.querySelectorAll('#sidebar .filter-group').forEach(g => {
+            if (g === group) return;
+            g.classList.add('collapsed');
+            g.classList.remove('active-group');
+        });
+
+        if (isCollapsing) {
+            group.classList.add('collapsed');
+            group.classList.remove('active-group');
+        } else {
+            group.classList.remove('collapsed');
+            group.classList.add('active-group');
+        }
+    },
+
+    initFilters() {
+        const dists = Object.keys(HIERARCHY).sort();
+        this.renderMultiSelect('f-dist', dists.map(d => ({ v: d, l: d })), 'onDistChange');
+
+        // Initial Load Defaults (Sargodha City + Cantonment)
+        if (HIERARCHY['SARGODHA']) {
+            this.setSelected('f-dist', ['SARGODHA']);
+        } else if (dists.length > 0) {
+            this.setSelected('f-dist', [dists[0]]);
+        }
+
+        this.onDistChange();
+
+        if (HIERARCHY['SARGODHA']?.['SARGODHA']) {
+            this.setSelected('f-tehsil', ['SARGODHA']);
+        }
+        this.onTehsilChange();
+
+        const mItems = this.getMultiSelectItems('f-mc');
+        const targetMC = mItems.find(item =>
+            item.value.toUpperCase().includes('CANTONMENT') ||
+            item.value.toUpperCase().includes('MC-1') ||
+            item.value.toUpperCase().includes('MC 1')
+        );
+        if (targetMC) {
+            this.setSelected('f-mc', [targetMC.value]);
+        }
+
+        // Init Flatpickr if not already
+        if (!State.fpStart) {
+            State.fpStart = flatpickr("#f-start", { onChange: () => this.apply() });
+            State.fpEnd = flatpickr("#f-end", { onChange: () => this.apply() });
+        }
+        this.updateSidebarStatus();
+    },
+
+    renderMultiSelect(id, items, onUpdate) {
+        const container = document.getElementById(id);
+        container.innerHTML = items.map(item => `
+                <div class="multi-option" data-value="${item.v}" onclick="App.handleMultiClick(event, '${id}', '${onUpdate}')">
+                    <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="App.handleMultiChange(event, '${id}', '${onUpdate}')">
+                    <span>${item.l}</span>
+                </div>
+            `).join('');
+    },
+
+    // Dedicated robust MC/UC multi-select using DOM API
+    renderMCUCSelect(items) {
+        const container = document.getElementById('f-mc');
+        container.innerHTML = ''; // Clear existing
+
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'multi-option';
+            div.setAttribute('data-value', item.v);
+            if (item.selected) div.classList.add('selected');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = item.selected || false;
+            checkbox.addEventListener('change', function () {
+                div.classList.toggle('selected', this.checked);
+            });
+
+            const span = document.createElement('span');
+            span.textContent = item.l;
+
+            div.appendChild(checkbox);
+            div.appendChild(span);
+
+            checkbox.addEventListener('change', function (e) {
+                e.stopPropagation();
+                div.classList.toggle('selected', this.checked);
+                // Decoupled from App.apply() - Selection Only
+                App.updateSidebarStatus();
+            });
+
+            // Click on row toggles checkbox
+            div.addEventListener('click', function (e) {
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    div.classList.toggle('selected', checkbox.checked);
+                    // Decoupled from App.apply() - Selection Only
+                    App.updateSidebarStatus();
+                }
+            });
+
+            container.appendChild(div);
+        });
+    },
+
+    // Get selected MC/UC values
+    getSelectedMCUC() {
+        const container = document.getElementById('f-mc');
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+        return Array.from(checkboxes).map(cb =>
+            cb.closest('.multi-option').getAttribute('data-value')
+        );
+    },
+
+
+    handleMultiClick(e, id, onUpdate) {
+        if (e.target.tagName === 'INPUT') return;
+        const row = e.currentTarget;
+        const cb = row.querySelector('input');
+        cb.checked = !cb.checked;
+        row.classList.toggle('selected', cb.checked);
+        if (onUpdate && App[onUpdate]) App[onUpdate]();
+    },
+
+    handleMultiChange(e, id, onUpdate) {
+        const row = e.target.closest('.multi-option');
+        row.classList.toggle('selected', e.target.checked);
+        if (onUpdate && App[onUpdate]) App[onUpdate]();
+    },
+
+    toggleAll(id, state) {
+        if (id === 'f-quick') {
+            Object.keys(State.quickFilters).forEach(key => {
+                State.quickFilters[key] = state;
+            });
+            // Sync UI
+            ['urban', 'rural', 'domestic', 'commercial'].forEach(key => {
+                const cb = document.getElementById(`q-${key}`);
+                if (cb) {
+                    cb.checked = state;
+                    cb.closest('.multi-option').classList.toggle('selected', state);
+                }
+            });
+            this.apply();
+            return;
+        }
+
+        const container = document.getElementById(id);
+        const checkboxes = container.querySelectorAll('input');
+        checkboxes.forEach(cb => {
+            cb.checked = state;
+            cb.closest('.multi-option').classList.toggle('selected', state);
+        });
+
+        if (id === 'f-dist') this.onDistChange();
+        else if (id === 'f-tehsil') this.onTehsilChange();
+        else if (id === 'f-pay' || id === 'f-drive' || id === 'f-surveyor') this.apply();
+
+        this.updateSidebarStatus();
+    },
+
+    getSelected(id) {
+        const container = document.getElementById(id);
+        return Array.from(container.querySelectorAll('.multi-option'))
+            .filter(row => row.querySelector('input').checked)
+            .map(row => row.getAttribute('data-value'));
+    },
+
+    getMultiSelectItems(id) {
+        const container = document.getElementById(id);
+        return Array.from(container.querySelectorAll('.multi-option')).map(row => ({
+            value: row.getAttribute('data-value')
+        }));
+    },
+
+    setSelected(id, values) {
+        const container = document.getElementById(id);
+        container.querySelectorAll('.multi-option').forEach(row => {
+            const val = row.getAttribute('data-value');
+            const checked = values.includes(val);
+            row.querySelector('input').checked = checked;
+            row.classList.toggle('selected', checked);
+        });
+    },
+
+    onDistChange() {
+        const selectedDists = this.getSelected('f-dist');
+        let items = [];
+
+        selectedDists.forEach(d => {
+            const tehsils = Object.keys(HIERARCHY[d] || {}).sort();
+            tehsils.forEach(t => {
+                items.push({ v: t, l: `${d} - ${t}` });
+            });
+        });
+
+        this.renderMultiSelect('f-tehsil', items, 'onTehsilChange');
+        this.onTehsilChange();
+    },
+    onTehsilChange() {
+        const items = this.getAvailableMCUCs();
+        const currentlySelected = this.getSelectedMCUC();
+        items.forEach(item => {
+            item.selected = currentlySelected.includes(item.v);
+        });
+        this.renderMCUCSelect(items);
+        this.updateSidebarStatus();
+    },
+
+    getAvailableMCUCs() {
+        const selectedDists = this.getSelected('f-dist');
+        const selectedTehsils = this.getSelected('f-tehsil');
+        let items = [];
+
+        selectedDists.forEach(d => {
+            const distData = HIERARCHY[d] || {};
+            selectedTehsils.forEach(t => {
+                const tehsilData = distData[t] || {};
+                for (let m in tehsilData) {
+                    items.push({
+                        v: m,
+                        l: `${t} - ${tehsilData[m].s}`,
+                        short: tehsilData[m].s
+                    });
+                }
+            });
+        });
+
+        items.sort((a, b) => {
+            const aShort = a.short.toUpperCase();
+            const bShort = b.short.toUpperCase();
+            const aIsMC = aShort.startsWith('MC');
+            const bIsMC = bShort.startsWith('MC');
+            if (aIsMC && !bIsMC) return -1;
+            if (!aIsMC && bIsMC) return 1;
+            const aNum = parseInt(aShort.replace(/[^0-9]/g, '')) || 0;
+            const bNum = parseInt(bShort.replace(/[^0-9]/g, '')) || 0;
+            if (aNum !== bNum) return aNum - bNum;
+            return a.l.localeCompare(b.l);
+        });
+        return items;
+    },
+
+    updateSurveyors(highlightName = null) {
+        const container = document.getElementById('f-surveyor');
+        if (!container) return;
+
+        if (highlightName) State.lastHighlightedSurveyor = highlightName;
+        const activeHighlight = highlightName || State.lastHighlightedSurveyor;
+        const currentSelected = this.getSelected('f-surveyor');
+
+        // Contextual Sorting: 1. Highlighted (Active View), 2. Selected (Checked), 3. Alphabetical
+        const sortedList = [...State.availableSurveyors].sort((a, b) => {
+            if (a === activeHighlight) return -1;
+            if (b === activeHighlight) return 1;
+            const aSel = currentSelected.includes(a);
+            const bSel = currentSelected.includes(b);
+            if (aSel && !bSel) return -1;
+            if (!aSel && bSel) return 1;
+            return a.localeCompare(b);
+        });
+
+        container.innerHTML = sortedList.map(name => {
+            const isSelected = currentSelected.includes(name);
+            const isHighlighted = name === activeHighlight;
+            return `
+                    <div class="multi-option ${isSelected ? 'selected' : ''} ${isHighlighted ? 'active-context' : ''}" 
+                         data-value="${name}" onclick="App.handleMultiClick(event, 'f-surveyor', 'apply')">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="App.handleMultiChange(event, 'f-surveyor', 'apply')">
+                        <span style="${isHighlighted ? 'font-weight:800; color:var(--primary);' : ''}">${name}</span>
+                    </div>
+                `;
+        }).join('');
+    },
+
+    setSurveyorFilter(selectedValues) {
+        // selectedValues is an array from multi-select
+        State.surveyorFilter = selectedValues.length > 0 ? selectedValues : [];
+        this.apply();
+        // If in list view, re-render implies updating the current view
+        if (document.getElementById('list-view-stage').classList.contains('active')) {
+            State.currentIdx = 0;
+            ListView.render();
+        }
+    },
+
+    apply(isInitial = false) {
+        // Keep track of total records for stats
+        const totalRecords = RAW_DATA.length;
+
+        let filtered = RAW_DATA;
+
+        // 1. Geographical Filters
+        const dists = this.getSelected('f-dist');
+        const tehsils = this.getSelected('f-tehsil');
+        const mcs = this.getSelectedMCUC();
+
+        if (dists.length) filtered = filtered.filter(r => dists.includes(r[10]));
+        if (tehsils.length) filtered = filtered.filter(r => tehsils.includes(r[11]));
+        if (mcs.length) filtered = filtered.filter(r => mcs.includes(r[12]));
+
+        // 2. Date Filter
+        const start = document.getElementById('f-start').value;
+        const end = document.getElementById('f-end').value;
+        if (start || end) {
+            const s = start ? new Date(start) : null;
+            const e = end ? new Date(end) : null;
+            filtered = filtered.filter(r => {
+                const d = new Date(r[7]);
+                if (s && d < s) return false;
+                if (e && d > e) return false;
+                return true;
+            });
+        }
+
+        // 3. Payment Filter
+        const pay = this.getSelected('f-pay');
+        if (pay.length) {
+            filtered = filtered.filter(r => {
+                const status = r[16].toLowerCase().replace(' ', '-');
+                return pay.includes(status);
+            });
+        }
+
+        // 4. Drive Sync Filter
+        const driveOnlyCb = document.getElementById('f-drive-only');
+        if (driveOnlyCb && driveOnlyCb.checked) {
+            filtered = filtered.filter(r => State.syncedData[r[0]]);
+        }
+
+        // 5. Quick Categories
+        const categories = [];
+        if (State.quickFilters.domestic) categories.push('domestic');
+        if (State.quickFilters.commercial) categories.push('commercial');
+
+        if (categories.length > 0) {
+            filtered = filtered.filter(r => {
+                const isCom = r[3] === 1;
+                if (isCom && categories.includes('commercial')) return true;
+                if (!isCom && categories.includes('domestic')) return true;
+                return false;
+            });
+        }
+
+        // Update Available Surveyors based on LOCATION context
+        const locSurveyors = [...new Set(filtered.map(r => r[6]))].filter(x => x);
+        if (JSON.stringify(State.availableSurveyors) !== JSON.stringify(locSurveyors)) {
+            State.availableSurveyors = locSurveyors;
+            this.updateSurveyors();
+        }
+
+        // 6. Surveyor Filter
+        const surv = this.getSelected('f-surveyor');
+        if (surv.length) {
+            filtered = filtered.filter(r => surv.includes(r[6]));
+        }
+
+        State.filtered = filtered;
+
+        // Re-calculate payColorMode based on current selections
+        State.payColorMode = pay.length > 0;
+
+        this.updateSidebarStatus();
+
+        // Extract Available Surveyors from Filtered Data for syncing the list
+        State.availableSurveyors = [...new Set(State.filtered.map(r => r[6]))].sort();
+
+        // Auto-reset surveyor filter if no longer in filtered set
+        if (State.surveyorFilter && State.surveyorFilter.length > 0) {
+            State.surveyorFilter = State.surveyorFilter.filter(sf => State.availableSurveyors.includes(sf));
+        }
+
+        this.render();
+        this.updateSurveyors();
+
+        // Universal Sync: Ensure List View stays in sync with sidebar updates
+        if (typeof ListView !== 'undefined' && document.getElementById('list-view-stage')?.classList.contains('active')) {
+            ListView.render();
+        }
+
+        if (!isInitial) {
+            // If a filter changed, reset current record to start of new filtered set
+            State.currentIdx = 0;
+
+            // Keep sidebar open in List View as per user request
+            // Only auto-close on mobile if not in list view
+            if (window.innerWidth <= 768 && !document.getElementById('list-view-stage')?.classList.contains('active')) {
+                Sidebar.close();
+            }
+
+            if (!document.getElementById('list-view-stage')?.classList.contains('active')) {
+                ViewSwitcher.toMap();
+            }
+        }
+    },
+
+    render() {
+        State.markers.clearLayers();
+        const bounds = L.latLngBounds();
+        const totalCount = State.filtered.length;
+        const displayCount = Math.min(totalCount, State.markerLimit);
+        document.getElementById('stat-count').innerText = `${displayCount} / ${totalCount}`;
+
+        // Dynamic Label Update
+        const labelEl = document.getElementById('stat-label');
+        if (labelEl) {
+            // Determine active context
+            let labelHTML = "Total Survey";
+
+            // Check filters in order of specificity
+            const mcs = App.getSelected('f-mc');
+            const tehsils = App.getSelected('f-tehsil');
+            const dists = App.getSelected('f-dist');
+
+            if (mcs.length > 0) {
+                const ctx = mcs.length === 1 ? mcs[0] : `${mcs.length} Areas`;
+                labelHTML = `Total Survey <span style="font-size:9px; font-weight:400; opacity:0.8; display:block;">(${ctx})</span>`;
+            } else if (tehsils.length > 0) {
+                const ctx = tehsils.length === 1 ? tehsils[0] : `${tehsils.length} Tehsils`;
+                labelHTML = `Total Survey <span style="font-size:9px; font-weight:400; opacity:0.8; display:block;">(${ctx})</span>`;
+            } else if (dists.length > 0) {
+                const ctx = dists.length === 1 ? dists[0] : `${dists.length} Districts`;
+                labelHTML = `Total Survey <span style="font-size:9px; font-weight:400; opacity:0.8; display:block;">(${ctx})</span>`;
+            }
+
+            labelEl.innerHTML = labelHTML;
+        }
+
+        // Use marker limit from settings
+        State.filtered.slice(0, State.markerLimit).forEach(r => {
+            // Skip records with invalid coordinates
+            if (!r[1] || !r[2] || isNaN(r[1]) || isNaN(r[2])) {
+                console.warn('Skipping record with invalid coordinates:', r[0], 'lat:', r[1], 'lng:', r[2]);
+                return;
+            }
+
+            const status = r[16].toLowerCase().replace(' ', '-');
+            let color = HIERARCHY[r[10]]?.[r[11]]?.[r[12]]?.c || '#2563eb';
+
+            // Override color if focusing on payment status visualization
+            if (State.payColorMode) {
+                if (status === 'paid') color = '#22c55e';
+                else if (status === 'unpaid') color = '#ef4444';
+                else color = '#94a3b8'; // Not Billed
+            }
+
+            const m = L.circleMarker([r[1], r[2]], {
+                radius: 5, fillColor: color, color: 'rgba(0,0,0,0.7)', weight: 0.8, fillOpacity: 0.7,
+                pane: 'markerPane', // Leaflet's marker pane has naturally higher z-index (600)
+                id: r[0].toString() // Store ID for lookup
+            });
+
+            m.on('click', () => {
+                App.updateSurveyors(r[6]);
+            });
+
+            const imgs = r[9].map(url => `<img src="${url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="Gallery.open('${url}', '${r[0]}')">`).join('');
+
+            const popup = `
+                    <div class="pop-card" style="position:relative; padding-top:4px;">
+                        <div style="position:absolute; top:36px; right:0; z-index:1;">
+                            <span class="pill ${status}" style="font-size:9px; padding:2px 8px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1); border:1px solid rgba(255,255,255,0.2);">${r[16]}</span>
+                        </div>
+                        
+                        <div class="pop-title" style="margin-bottom:12px;">
+                            <a href="javascript:void(0)" onclick="ListView.jumpFromMap('${r[0]}')" style="color:var(--primary); text-decoration:none; font-weight:800; border-bottom:1.5px dashed var(--primary); font-size:14px;">ID: #${r[0]}</a>
+                        </div>
+                        
+                        <div style="font-size:12px; margin-bottom:8px">
+                            <div style="margin-bottom:8px;">
+                                <b style="display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:85%;">${decodePII(r[4])}</b>
+                                <span style="font-size:10px; color:#64748b;">${r[6]} | ${r[3] === 1 ? 'Commercial' : 'Domestic'}</span>
+                            </div>
+
+                            <div style="border-top:1px solid #f1f5f9; margin:8px 0; padding-top:8px; font-size:11px; color:#475569;">
+                                <div style="display:flex; justify-content:space-between;"><span>PSID:</span> <b>${decodePII(r[15])}</b></div>
+                                <div style="display:flex; justify-content:space-between;"><span>Amount:</span> <b>Rs. ${r[17]}</b></div>
+                                <div style="display:flex; justify-content:space-between;"><span>Date:</span> <b>${r[18]}</b></div>
+                            </div>
+                            <small style="display:block; margin-top:4px; opacity:0.7;">${r[11]} - ${r[12]}</small>
+                        </div>
+                        <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:8px;">${imgs}</div>
+                    </div>
+                `;
+            m.bindPopup(popup);
+            State.markers.addLayer(m);
+            bounds.extend([r[1], r[2]]);
+        });
+
+        if (bounds.isValid()) {
+            const currentBounds = State.map.getBounds();
+            // Optimization: only fitBounds if markers are outside current view or it's a significant change
+            if (!currentBounds.contains(bounds.getSouthWest()) || !currentBounds.contains(bounds.getNorthEast())) {
+                State.map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
+            }
+        }
+    }
+};
+
+const ViewSwitcher = {
+    toList() {
+        try {
+            document.getElementById('main-stage').classList.add('hide-map-ui');
+            document.getElementById('list-view-stage').classList.add('active');
+            const stage = document.getElementById('paid-dashboard-stage');
+            if (stage) stage.style.display = 'none';
+
+            // If we didn't come from dashboard, it's a map origin
+            if (State.originView !== 'dashboard') State.originView = 'map';
+
+            State.currentIdx = 0;
+            ListView.render();
+            document.getElementById('map').style.visibility = 'hidden';
+
+            setTimeout(() => {
+                if (State.map) State.map.invalidateSize();
+            }, 50);
+        } catch (e) { console.error("ViewSwitcher.toList failed:", e); }
+    },
+    toMap() {
+        document.getElementById('main-stage').classList.remove('hide-map-ui');
+        document.getElementById('list-view-stage').classList.remove('active');
+        document.getElementById('paid-dashboard-stage').style.display = 'none';
+        document.getElementById('map').style.visibility = 'visible';
+        State.originView = 'map';
+
+        // Immediate resize for responsive layout
+        if (State.map) State.map.invalidateSize();
+
+        // Delayed resize to ensure transitions are finished
+        setTimeout(() => {
+            if (State.map) State.map.invalidateSize();
+        }, 350);
+    },
+    toDashboard() {
+        document.getElementById('main-stage').classList.add('hide-map-ui');
+        document.getElementById('paid-dashboard-stage').style.display = 'flex';
+        document.getElementById('list-view-stage').classList.remove('active');
+        document.getElementById('map').style.visibility = 'hidden';
+        State.originView = 'dashboard';
+
+        // Only auto-close sidebar on mobile
+        if (window.innerWidth <= 768) Sidebar.close();
+    },
+    back() {
+        if (State.originView === 'dashboard') {
+            this.toDashboard();
+        } else {
+            this.toMap();
+        }
+    }
+};
+
+const ListView = {
+    render() {
+        if (State.currentIdx >= State.filtered.length && State.filtered.length > 0) {
+            State.currentIdx = 0;
+        }
+        const r = State.filtered[State.currentIdx];
+        if (r) App.updateSurveyors(r[6]); // Contextual highlight/sort
+
+        const el = document.getElementById('lv-content');
+        const total = State.filtered.length;
+
+        document.getElementById('lv-idx').innerText = total > 0 ? State.currentIdx + 1 : 0;
+        document.getElementById('lv-total').innerText = total;
+
+        // Integrity: Clear pending sync files when switching records
+        DriveSync.files = [];
+
+        // Ensure filters are rendered if not already
+        if (!document.getElementById('lv-surveyor-dropdown')) {
+            // No longer needed as filters are unified in the sidebar
+            const navFilter = document.getElementById('lv-search-container');
+            if (navFilter) navFilter.innerHTML = '';
+        }
+
+        if (!r) {
+            el.innerHTML = `
+                    <div class="card-header" style="display:flex; justify-content:center; align-items:center; height:200px;">
+                        <div class="card-title" style="color:#64748b">No records match the current filters.</div>
+                    </div>`;
+            return;
+        }
+
+        // Contextual Naming
+        const dists = App.getSelected('f-dist');
+        const tehsils = App.getSelected('f-tehsil');
+        let displayName = decodePII(r[4]);
+        if (tehsils.length > 1 || dists.length > 1) {
+            displayName += ` (${r[11]})`;
+        }
+
+        const paidCount = State.filtered.filter(rec => rec[16].toLowerCase() === 'paid').length;
+        const payStatus = r[16].toLowerCase().replace(' ', '-');
+        let totalPayable = r[20] ? r[20].toString().trim() : '0';
+        if (totalPayable.toLowerCase() === 'nan' || !totalPayable) totalPayable = '0';
+
+        // Coordinate Accuracy Calculation
+        const rawLat = r[1], rawLon = r[2];
+        const ocr = r[21]; // [lat, lon] or null
+        let accuracyBadge = '';
+        let correctedInfo = '';
+
+        if (ocr && ocr[0] && ocr[1]) {
+            const dist = Utils.getDistance(rawLat, rawLon, ocr[0], ocr[1]);
+            if (dist !== null) {
+                const isAccurate = dist < 50; // Green if < 50m
+                const isWarning = dist >= 50 && dist < 150;
+                const color = isAccurate ? '#22c55e' : (isWarning ? '#f59e0b' : '#ef4444');
+                const label = isAccurate ? 'Accurate' : (isWarning ? 'Mismatched' : 'Critical Shift');
+
+                accuracyBadge = `<span class="pill" style="background:${color}15; color:${color}; border:1px solid ${color}30; font-size:10px; padding:2px 8px; font-weight:700;">${label}: ${Math.round(dist)}m</span>`;
+
+                correctedInfo = `
+                        <div style="margin-top:4px; padding:6px 10px; background:#f0f9ff; border-radius:8px; border:1px solid #e0f2fe; display:flex; align-items:center; gap:8px;">
+                            <span class="material-icons-round" style="font-size:16px; color:#0369a1;">gps_fixed</span>
+                            <div style="font-size:11px; color:#0369a1; font-weight:700;">
+                                Corrected: <span style="font-family:monospace;">${ocr[0].toFixed(5)}, ${ocr[1].toFixed(5)}</span>
+                            </div>
+                            <button onclick="ListView.showOnMap('${r[0]}', true)" style="margin-left:auto; background:white; border:1px solid #bae6fd; border-radius:4px; padding:2px 6px; font-size:10px; font-weight:800; color:#0369a1; cursor:pointer;">VIEW</button>
+                        </div>
+                    `;
+            }
+        } else {
+            accuracyBadge = `<span class="pill" style="background:#f1f5f9; color:#94a3b8; border:1px solid #e2e8f0; font-size:10px; padding:2px 8px; font-weight:700;">No Image Coords</span>`;
+        }
+
+        el.innerHTML = `
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="flex:1; min-width:0; padding-right:12px;">
+                        <div class="card-title" style="margin:0; line-height:1.1; font-size:18px;">Survey ID #${r[0]}</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                            <div style="color:#64748b; font-weight:500; font-size:11px;">${r[6]} | ${r[7]} ${r[8]}</div>
+                            ${accuracyBadge}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-shrink:0; margin-top:2px; position:relative;">
+                         <button onclick="ListView.showOnMap('${r[0]}')" title="Show on Map" style="background:#f1f5f9; color:var(--primary); border:1px solid #e2e8f0; border-radius:8px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+                            <span class="material-icons-round" style="font-size:20px;">my_location</span>
+                        </button>
+                        <div id="lv-sort-btn-wrapper" style="position:relative;">
+                            <button onclick="ListView.toggleSortDropdown()" title="Sort Records" style="background:#f1f5f9; color:var(--primary); border:1px solid #e2e8f0; border-radius:8px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+                                <span class="material-icons-round" style="font-size:20px;">sort</span>
+                            </button>
+                            <div id="lv-sort-dropdown" style="display:none; position:absolute; right:0; top:42px; background:white; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.15); min-width:200px; z-index:1001; overflow:hidden;">
+                                <div onclick="ListView.sort('id-desc')" style="padding:12px 16px; font-size:12px; font-weight:600; cursor:pointer; border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">ID (Newest First)</div>
+                                <div onclick="ListView.sort('id-asc')" style="padding:12px 16px; font-size:12px; font-weight:600; cursor:pointer; border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">ID (Oldest First)</div>
+                                <div onclick="ListView.sort('drive-desc')" style="padding:12px 16px; font-size:12px; font-weight:600; cursor:pointer; border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">Latest Drive Upload</div>
+                                <div onclick="ListView.sort('status-paid')" style="padding:12px 16px; font-size:12px; font-weight:600; cursor:pointer; border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">Status (Paid First)</div>
+                                <div onclick="ListView.sort('status-unpaid')" style="padding:12px 16px; font-size:12px; font-weight:600; cursor:pointer; border-bottom:1px solid #f1f5f9;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">Status (Unpaid First)</div>
+                                <div onclick="ListView.sort('status-not-billed')" style="padding:12px 16px; font-size:12px; font-weight:600; cursor:pointer;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='none'">Status (Not Billed First)</div>
+                            </div>
+                        </div>
+                        <button onclick="BillVerifier.open('${r[15]}')" title="Verify PSID" style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; border-radius:6px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                            <span class="material-icons-round" style="font-size:18px;">verified_user</span>
+                        </button>
+                         <button onclick="Sidebar.toggle()" title="Open Filters" style="background:#f1f5f9; color:var(--primary); border:1px solid #e2e8f0; border-radius:8px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+                            <span class="material-icons-round" style="font-size:20px;">tune</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-grid">
+                    <!-- Row 1: Name, PSID, Status -->
+                    <div style="grid-column: span 1;">
+                        <div style="color:#2563eb; font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${decodePII(r[4])}">${decodePII(r[4])}</div>
+                    </div>
+                    <div style="grid-column: span 1;">
+                        <div style="color:#2563eb; font-weight:800; font-size:14px;">${decodePII(r[15])}</div>
+                    </div>
+                    <div style="grid-column: span 1; text-align:right;">
+                        <span class="pill ${payStatus}" style="font-size:11px; padding:2px 10px;">${r[16]}</span>
+                    </div>
+
+                    <!-- Row 2: UC Type, Consumer Type, Amount -->
+                    <div style="grid-column: span 1;">
+                        <div style="font-weight:600; font-size:13px; color:var(--text);">${r[14] || 'N/A'}</div>
+                    </div>
+                    <div style="grid-column: span 1;">
+                        <div style="font-weight:600; font-size:13px; color:var(--text);">${r[3] === 1 ? 'Commercial' : 'Domestic'}</div>
+                    </div>
+                    <div style="grid-column: span 1; text-align:right;">
+                        <div style="font-weight:800; font-size:14px; color:#ef4444;">Rs. ${totalPayable}</div>
+                    </div>
+
+                    <!-- Row 3: Address (Full Width) -->
+                    <div style="grid-column: span 3; border-top:1px solid #f1f5f9; padding-top:8px;">
+                        <div style="font-weight:600; font-size:13px; color:var(--text); line-height:1.4;">${decodePII(r[5])}</div>
+                    </div>
+
+                    <!-- Row 4: Area (Full Width) -->
+                    <div style="grid-column: span 3; border-top:1px dashed #f1f5f9; padding-top:4px;">
+                        <div style="font-weight:600; font-size:12px; color:#64748b;">${r[11]} - ${r[12]}</div>
+                        ${correctedInfo}
+                    </div>
+                </div>
+                
+                <div class="card-gallery" id="gal-${r[0].toString().replace(/[^a-z0-9]/gi, '_')}">
+                    ${r[9].map(url => `<img src="${url}" class="gallery-thumb" onclick="Gallery.open('${url}', '${r[0]}')">`).join('')}
+                    <div id="synced-gallery-${r[0].toString().replace(/[^a-z0-9]/gi, '_')}" style="display:contents;"></div>
+                </div>
+
+                <!-- Modernized Sync Station (v4.2) -->
+                <div class="sync-station">
+                    <div class="sync-station-header">
+                        <div class="sync-station-title">Google Drive Sync</div>
+                        <div class="sync-status-badge" id="drive-status-${r[0].toString().replace(/[^a-z0-9]/gi, '_')}">Checking...</div>
+                    </div>
+
+                    <div class="sync-select-wrapper">
+                        <select id="drive-email" onchange="DriveSync.saveEmail(this.value)">
+                            <option value="">Loading Surveyors...</option>
+                        </select>
+                    </div>
+
+                    <div id="drive-preview" class="sync-preview-strip"></div>
+
+                    <input type="file" id="drive-upload-input" accept="image/*" capture="environment" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
+                    
+                    <div class="sync-action-grid">
+                        <button onclick="document.getElementById('drive-upload-input').click()" class="sync-action-btn camera">
+                            <span class="material-icons-round">photo_camera</span> Take Picture
+                        </button>
+                        <button id="btn-sync-drive" onclick="DriveSync.upload('${r[0]}')" class="sync-action-btn upload">
+                            <span class="material-icons-round">cloud_upload</span> Sync Now
+                        </button>
+                    </div>
+                </div>
+            `;
+
+        // Post-render init for DriveSync (Email & Metadata)
+        setTimeout(() => {
+            DriveSync.init();
+            DriveSync.fetchMetadata(r[0]);
+        }, 10);
+    },
+    next() { if (State.currentIdx < State.filtered.length - 1) { State.currentIdx++; this.render(); } },
+    prev() { if (State.currentIdx > 0) { State.currentIdx--; this.render(); } },
+
+    jumpFromMap(id) {
+        ViewSwitcher.toList();
+        // Critical: If coming from a single-search result, restore context first
+        if (State.lastView) ListView.restoreView();
+
+        setTimeout(() => {
+            this.jumpToID(id);
+            // Background maintenance: Ensure any existing search input is updated
+            const input = document.getElementById('lv-search-id');
+            if (input) input.value = id;
+        }, 150);
+    },
+
+
+    showOnMap(id, useOcr = false) {
+        const record = RAW_DATA.find(r => r[0].toString() === id.toString());
+        if (!record) return;
+
+        let lat = record[1], lon = record[2];
+        if (useOcr && record[21] && record[21][0]) {
+            lat = record[21][0];
+            lon = record[21][1];
+        }
+
+        // State Preservation: Save current filtered state to return later
+        // We save a deep copy of the filtered array and the current index
+        State.lastView = {
+            filtered: [...State.filtered],
+            idx: State.currentIdx
+        };
+
+        // Override Filters to show only this record
+        State.filtered = [record];
+        State.currentIdx = 0;
+        App.render();
+
+        ViewSwitcher.toMap();
+        State.map.flyTo([lat, lon], 19);
+
+        setTimeout(() => {
+            State.markers.eachLayer(layer => {
+                if (layer.options.id === id.toString()) {
+                    layer.openPopup();
+                }
+            });
+        }, 1000); // Increased timeout for flyTo completion
+
+        // Update Label with Restore option
+        const statLabel = document.getElementById('stat-label');
+        if (statLabel) {
+            statLabel.innerHTML = `Single ID Mode <a href="javascript:void(0)" onclick="ListView.restoreView()" style="color:var(--primary); margin-left:8px; text-decoration:underline;">[Return to List]</a>`;
+        }
+    },
+
+    restoreView() {
+        if (State.lastView) {
+            State.filtered = [...State.lastView.filtered];
+            State.currentIdx = State.lastView.idx;
+            State.lastView = null;
+        }
+        App.render();
+        if (document.getElementById('list-view-stage').classList.contains('active')) {
+            this.render();
+        }
+    },
+
+    toggleSortDropdown() {
+        const dd = document.getElementById('lv-sort-dropdown');
+        if (!dd) return;
+        dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+    },
+
+    sort(criteria) {
+        if (criteria === 'id-desc') State.filtered.sort((a, b) => b[0] - a[0]);
+        else if (criteria === 'id-asc') State.filtered.sort((a, b) => a[0] - b[0]);
+        else if (criteria === 'status-paid') {
+            State.filtered.sort((a, b) => {
+                const sA = a[16].toLowerCase(), sB = b[16].toLowerCase();
+                if (sA === 'paid' && sB !== 'paid') return -1;
+                if (sA !== 'paid' && sB === 'paid') return 1;
+                return 0;
+            });
+        } else if (criteria === 'status-unpaid') {
+            State.filtered.sort((a, b) => {
+                const sA = a[16].toLowerCase(), sB = b[16].toLowerCase();
+                if (sA === 'unpaid' && sB !== 'unpaid') return -1;
+                if (sA !== 'unpaid' && sB === 'unpaid') return 1;
+                return 0;
+            });
+        } else if (criteria === 'status-not-billed') {
+            State.filtered.sort((a, b) => {
+                const statusA = a[16].toLowerCase();
+                const statusB = b[16].toLowerCase();
+                if (statusA === 'not billed' && statusB !== 'not billed') return -1;
+                if (statusA !== 'not billed' && statusB === 'not billed') return 1;
+                return 0;
+            });
+        } else if (criteria === 'drive-desc') {
+            State.filtered.sort((a, b) => {
+                const tA = State.syncedData[a[0]] ? new Date(State.syncedData[a[0]]).getTime() : 0;
+                const tB = State.syncedData[b[0]] ? new Date(State.syncedData[b[0]]).getTime() : 0;
+                return tB - tA;
+            });
+        }
+        State.currentIdx = 0;
+        this.render();
+        document.getElementById('lv-sort-dropdown').style.display = 'none';
+    },
+
+    jumpToID(id) {
+        if (!id) return;
+        const searchId = id.toString().trim();
+        const idx = State.filtered.findIndex(r => r[0].toString().trim() === searchId);
+
+        if (idx !== -1) {
+            State.currentIdx = idx;
+            this.render();
+        } else {
+            const record = RAW_DATA.find(r => r[0].toString().trim() === searchId);
+            if (record) {
+                if (!State.lastView) State.lastView = { filtered: [...State.filtered], idx: State.currentIdx };
+                State.filtered = [record];
+                State.currentIdx = 0;
+                this.render();
+                const statLabel = document.getElementById('stat-label');
+                if (statLabel) statLabel.innerHTML = `Single ID Mode <a href="javascript:void(0)" onclick="ListView.restoreView()" style="color:var(--primary); margin-left:8px; text-decoration:underline; font-size:10px;">[RETURN]</a>`;
+            } else {
+                App.showToast ? App.showToast(`ID #${id} not found.`) : alert(`ID #${id} not found.`);
+            }
+        }
+    }
+};
+
+const Stats = {
+    open() {
+        const dataByName = {};
+        State.filtered.forEach(r => {
+            const name = r[6];
+            if (!dataByName[name]) dataByName[name] = [];
+            dataByName[name].push(r);
+        });
+
+        // Sort staff by count
+        const sorted = Object.entries(dataByName).sort((a, b) => b[1].length - a[1].length);
+
+        // Dynamic Heading
+        const dists = App.getSelected('f-dist').join(', ') || 'All';
+        const tehsils = App.getSelected('f-tehsil').join(', ') || 'All';
+        document.getElementById('stats-title').innerHTML = `Staff Workflow Leaderboard: ${dists} (${tehsils}) <span style="margin-left:30px; font-size:0.9em; color:#475569;">Total: ${State.filtered.length}</span>`;
+
+        let html = `<table style="width:100%; border-collapse:collapse; font-size:12px; min-width:650px;">
+                <thead style="background:#f8fafc; position:sticky; top:0; z-index:10;">
+                    <tr>
+                        <th style="padding:8px; text-align:center; width: 80px;">Count</th>
+                        <th style="padding:8px; text-align:left;">Staff</th>
+                        <th style="padding:8px; text-align:center;">Idle</th>
+                        <th style="padding:8px; text-align:center;">First / Last</th>
+                        <th style="padding:8px; text-align:center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        sorted.forEach(([name, records], i) => {
+            // Calculate Stats Dynamically for the filtered range
+            const sortedRecs = records.slice().sort((a, b) => a[8].localeCompare(b[8]));
+            const first = sortedRecs[0][8];
+            const last = sortedRecs[sortedRecs.length - 1][8];
+
+            let warn = 0, idle = 0;
+            const windowStart = "10:00:00";
+            const windowEnd = "17:00:00";
+            const shutdownCutoff = "16:55:00";
+
+            for (let j = 1; j < sortedRecs.length; j++) {
+                const t1 = sortedRecs[j - 1][8];
+                const t2 = sortedRecs[j][8];
+                if (t1 < windowStart || t1 > windowEnd) continue;
+
+                const d1 = new Date(`2000-01-01T${t1}`);
+                const d2 = new Date(`2000-01-01T${t2}`);
+                let diff = (d2 - d1) / 60000;
+
+                const lStart = new Date(`2000-01-01T13:00:00`);
+                const lEnd = new Date(`2000-01-01T14:00:00`);
+                const overlapStart = new Date(Math.max(d1, lStart));
+                const overlapEnd = new Date(Math.min(d2, lEnd));
+                if (overlapEnd > overlapStart) diff -= (overlapEnd - overlapStart) / 60000;
+
+                if (diff > 60) idle++;
+                else if (diff > 30) warn++;
+            }
+
+            // Tiered Trophies
+            let trophy = "";
+            if (i === 0) trophy = `<span class="trophy gold">🏆</span>`;
+            else if (i === 1) trophy = `<span class="trophy silver">🥈</span>`;
+            else if (i < 5) trophy = `<span class="trophy bronze">🥉</span>`;
+
+            let statusMsg = '<span class="status-msg status-ok">Active</span>';
+            if (idle > 0) statusMsg = '<span class="status-msg status-idle">Idle!</span>';
+            else if (warn > 0) statusMsg = '<span class="status-msg status-warn">Delay</span>';
+
+            const countClass = records.length > 100 ? 'count-high' : '';
+            const idleClass = idle > 0 ? 'idle-danger' : (warn > 0 ? 'idle-warn' : '');
+            const lastClass = last < shutdownCutoff ? 'time-warning' : '';
+
+            html += `<tr class="rank-row" style="${i === 0 ? 'height: 60px;' : ''}">
+                    <td style="padding:8px; text-align:center;">
+                        <span class="count-badge ${countClass}">${records.length}</span>
+                    </td>
+                    <td style="padding:8px; font-weight:700;">${name}${trophy}</td>
+                    <td style="padding:8px; text-align:center;" class="${idleClass}">${idle + warn}</td>
+                    <td style="padding:8px; text-align:center; font-size:12px; color:#475569;">
+                        <b>${first}</b><br><span class="${lastClass}">${last}</span>
+                    </td>
+                    <td style="padding:8px; text-align:center;">${statusMsg}</td>
+                </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById('stats-body').innerHTML = html;
+        document.getElementById('modal-stats').style.display = 'flex';
+    },
+    close() { document.getElementById('modal-stats').style.display = 'none'; }
+};
+
+const Gallery = {
+    scale: 1, rot: 0,
+    images: [], idx: 0,
+    posX: 0, posY: 0,
+    isDragging: false,
+    startX: 0, startY: 0,
+
+    open(src, surveyId) {
+        const safeId = surveyId.toString().replace(/[^a-z0-9]/gi, '_');
+        const galContainer = document.getElementById(`gal-${safeId}`);
+        if (galContainer) {
+            // Collect ALL images from the gallery container (original and synced)
+            const allThumbs = Array.from(galContainer.querySelectorAll('img'));
+            this.images = allThumbs.map(img => img.src);
+        } else {
+            const record = RAW_DATA.find(r => r[0] == surveyId);
+            this.images = record ? record[9] : [src];
+        }
+
+        this.idx = this.images.indexOf(src);
+        if (this.idx === -1) this.idx = 0;
+
+        this.updateImage();
+        document.getElementById('gallery').classList.add('active');
+
+        // Add Keyboard listeners
+        this._boundKeyHandler = (e) => this.handleKeys(e);
+        window.addEventListener('keydown', this._boundKeyHandler);
+    },
+
+    close() {
+        document.getElementById('gallery').classList.remove('active');
+        window.removeEventListener('keydown', this._boundKeyHandler);
+    },
+
+    handleKeys(e) {
+        if (e.key === 'ArrowRight') this.next();
+        if (e.key === 'ArrowLeft') this.prev();
+        if (e.key === 'Escape') this.close();
+        if (e.key === '+' || e.key === '=') this.zoomIn();
+        if (e.key === '-' || e.key === '_') this.zoomOut();
+        if (e.key.toLowerCase() === 'r') this.rotate();
+    },
+
+    next() { this.idx = (this.idx + 1) % this.images.length; this.updateImage(); },
+    prev() { this.idx = (this.idx - 1 + this.images.length) % this.images.length; this.updateImage(); },
+
+    updateImage() {
+        const img = document.getElementById('gal-img');
+        img.src = this.images[this.idx];
+        this.reset();
+        const counter = document.getElementById('gal-counter');
+        if (counter) counter.innerText = `${this.idx + 1} / ${this.images.length}`;
+    },
+
+    rotate() { this.rot = (this.rot + 90) % 360; this.updateTransform(); },
+    zoomIn() { this.scale = Math.min(5, this.scale + 0.3); this.updateTransform(); },
+    zoomOut() { this.scale = Math.max(0.5, this.scale - 0.3); this.updateTransform(); },
+    reset() {
+        this.scale = 1; this.rot = 0;
+        this.posX = 0; this.posY = 0;
+        this.updateTransform();
+    },
+
+    updateTransform() {
+        const img = document.getElementById('gal-img');
+        if (this.isDragging) img.classList.add('no-transition');
+        else img.classList.remove('no-transition');
+
+        img.style.transform = `translate(${this.posX}px, ${this.posY}px) rotate(${this.rot}deg) scale(${this.scale})`;
+
+        // Standard cursor behavior
+        if (this.scale > 1.05) {
+            img.style.cursor = this.isDragging ? 'grabbing' : 'grab';
+        } else {
+            img.style.cursor = 'default';
+        }
+    },
+
+    // Interaction state
+    onStart(e) {
+        if (e.target.closest('.gal-controls')) return;
+
+        if (e.type === 'touchstart') {
+            this.touchstartX = e.touches[0].clientX;
+            this.touchstartY = e.touches[0].clientY;
+
+            // For 2-finger panning / pinching
+            if (e.touches.length === 2) {
+                this._pinchStartDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                this._pinchStartScale = this.scale;
+                this._pinchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - this.posX;
+                this._pinchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - this.posY;
+                this.isDragging = false;
+            } else {
+                // Start dragging for mobile (if zoomed)
+                if (this.scale > 1.01) {
+                    this.isDragging = true;
+                    this.startX = e.touches[0].clientX - this.posX;
+                    this.startY = e.touches[0].clientY - this.posY;
+                }
+            }
+        } else {
+            // Desktop Mouse Start
+            if (this.scale > 1.01) {
+                this.isDragging = true;
+                this.startX = e.clientX - this.posX;
+                this.startY = e.clientY - this.posY;
+                this.updateTransform();
+            }
+        }
+    },
+
+    onMove(e) {
+        // Early return if no valid active state
+        if (!this.isDragging && !this._pinchStartDist) return;
+        e.preventDefault();
+
+        if (e.type === 'touchmove') {
+            // Mobile Pinch and 2-Finger Pan
+            if (e.touches.length === 2 && this._pinchStartDist) {
+                const dist = Math.hypot(
+                    e.touches[1].clientX - e.touches[0].clientX,
+                    e.touches[1].clientY - e.touches[0].clientY
+                );
+                const zoomFactor = dist / this._pinchStartDist;
+                this.scale = Math.min(5, Math.max(0.5, this._pinchStartScale * zoomFactor));
+
+                if (this.scale > 1.01) {
+                    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                    this.posX = midX - this._pinchStartX;
+                    this.posY = midY - this._pinchStartY;
+                }
+                this.updateTransform();
+            }
+            // Mobile Single Touch Pan
+            else if (this.isDragging && this.scale > 1.01) {
+                this.posX = e.touches[0].clientX - this.startX;
+                this.posY = e.touches[0].clientY - this.startY;
+                this.updateTransform();
+            }
+        } else {
+            // Desktop Mouse Move (Strict button check + drag state)
+            if (this.isDragging && this.scale > 1.01 && (e.buttons & 1)) {
+                this.posX = e.clientX - this.startX;
+                this.posY = e.clientY - this.startY;
+                this.updateTransform();
+            } else if (this.isDragging) {
+                // Safety: if mouse is up but listener missed it
+                this.onEnd(e);
+            }
+        }
+    },
+
+    onEnd(e) {
+        // Mobile Swipe Detection
+        if (e.type === 'touchend' && this.scale <= 1.01 && this.touchstartX !== undefined) {
+            const deltaX = e.changedTouches[0].clientX - this.touchstartX;
+            const deltaY = e.changedTouches[0].clientY - this.touchstartY;
+
+            if (Math.abs(deltaX) > 60 && Math.abs(deltaY) < 100) {
+                if (deltaX < 0) this.next();
+                else this.prev();
+            }
+        }
+
+        this.isDragging = false;
+        this._pinchStartDist = null;
+        this.touchstartX = undefined;
+        this.updateTransform(); // Refresh cursor state
+    },
+
+    onWheel(e) {
+        e.preventDefault();
+        const zoomSpeed = 0.2;
+        const prevScale = this.scale;
+
+        // Calculate new scale
+        if (e.deltaY < 0) this.scale = Math.min(5, this.scale + zoomSpeed);
+        else this.scale = Math.max(0.5, this.scale - zoomSpeed);
+
+        // Zoom towards cursor (Standard Pro behavior)
+        if (this.scale !== prevScale) {
+            const rect = document.getElementById('gal-vp').getBoundingClientRect();
+            const mouseX = e.clientX - (rect.left + rect.width / 2);
+            const mouseY = e.clientY - (rect.top + rect.height / 2);
+
+            const ratio = (this.scale / prevScale) - 1;
+            this.posX -= (mouseX - this.posX) * ratio;
+            this.posY -= (mouseY - this.posY) * ratio;
+        }
+
+        this.updateTransform();
+    },
+
+    clickNav(e) {
+        // Only navigate if NOT dragging significantly and NOT clicking image when zoomed
+        if (this.scale > 1.2 && e.target.tagName === 'IMG') return;
+        if (e.target.closest('.gal-controls')) return;
+
+        const width = document.getElementById('gal-vp').clientWidth;
+        const rect = document.getElementById('gal-vp').getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+
+        // Threshold for navigation
+        if (clickX > width * 0.7) this.next();
+        else if (clickX < width * 0.3) this.prev();
+    }
+};
+
+const DriveSync = {
+    files: [],
+    MAX: 999, // Effectively Unlimited
+    APP_URL: 'https://script.google.com/macros/s/AKfycbxKdvyJf00rvveSyqPVMvk1iNSq_gbmFAHKkk51utr0Ptaoetqwyu_ftwritA-W06VmLw/exec',
+    whitelist: null,
+    currentDriveCount: 0,
+
+    _safeId(id) { return id.toString().replace(/[^a-z0-9]/gi, '_'); },
+
+    saveEmail(email) {
+        localStorage.setItem('surveyor_email', email);
+    },
+
+    getEmail() {
+        return localStorage.getItem('surveyor_email') || '';
+    },
+
+    init() {
+        if (this.whitelist) {
+            this.renderWhitelist(this.whitelist);
+        } else {
+            this.fetchWhitelist();
+        }
+    },
+
+    async fetchWhitelist() {
+        if (!this.APP_URL) return;
+        this.APP_URL = this.APP_URL.trim();
+        console.log("Checking connection to:", this.APP_URL);
+
+        try {
+            const resp = await fetch(`${this.APP_URL}?action=get_whitelist`, {
+                mode: 'cors',
+                cache: 'no-cache'
+            });
+
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+            const res = await resp.json();
+            if (res.status === 'success' && res.data) {
+                this.whitelist = res.data;
+                this.renderWhitelist(res.data);
+            } else {
+                throw new Error(res.message || "Invalid Response");
+            }
+        } catch (e) {
+            console.error("Whitelist fetch error:", e);
+            const select = document.getElementById('drive-email');
+            if (select) {
+                select.innerHTML = `<option value="">⚠️ Connection Failed: ${e.message}</option>`;
+                select.style.borderColor = 'var(--danger)';
+            }
+        }
+    },
+
+    renderWhitelist(emails) {
+        const select = document.getElementById('drive-email');
+        if (!select) return;
+
+        const savedEmail = this.getEmail();
+        const currentUserEmail = (window.USER && window.USER.email) ? window.USER.email.toLowerCase() : '';
+
+        let html = '<option value="">Select Surveyor Email</option>';
+        emails.forEach(email => {
+            const isMe = email.toLowerCase() === currentUserEmail;
+            const isSelected = email.toLowerCase() === savedEmail.toLowerCase();
+
+            // Use symbols to visually distinguish
+            const prefix = isMe ? '● ' : '○ ';
+            const label = prefix + email + (isMe ? ' (You)' : '');
+
+            html += `<option value="${email}" ${isSelected ? 'selected' : ''} style="${!isMe ? 'color:#94a3b8;' : 'font-weight:bold;'}">${label}</option>`;
+        });
+        select.innerHTML = html;
+
+        // Apply visual dimming to the select element itself if an inactive email is selected
+        select.onchange = (e) => {
+            const val = e.target.value;
+            this.saveEmail(val);
+            if (val && val.toLowerCase() !== currentUserEmail) {
+                select.style.opacity = '0.6';
+                select.style.fontStyle = 'italic';
+            } else {
+                select.style.opacity = '1';
+                select.style.fontStyle = 'normal';
+            }
+        };
+        // Initial style check
+        if (savedEmail && savedEmail.toLowerCase() !== currentUserEmail) {
+            select.style.opacity = '0.6';
+            select.style.fontStyle = 'italic';
+        }
+    },
+
+    async fetchAllSyncedData() {
+        if (!this.APP_URL) return;
+        console.log("Fetching all synced IDs...");
+        try {
+            const resp = await fetch(`${this.APP_URL}?action=get_all_synced_ids`);
+            const res = await resp.json();
+            if (res.status === 'success' && res.data) {
+                // Expecting res.data to be { surveyId: timestamp, ... }
+                State.syncedData = res.data;
+                console.log("Synced data loaded:", Object.keys(State.syncedData).length, "records");
+                // Re-apply filters if the filter was already enabled or just to update status
+                if (State.driveOnlyFilter) App.apply();
+            }
+        } catch (e) {
+            console.error("Error fetching all synced data:", e);
+        }
+    },
+
+    async fetchMetadata(surveyId) {
+        if (!this.APP_URL) return;
+        const sid = this._safeId(surveyId);
+        const statusEl = document.getElementById(`drive-status-${sid}`);
+        try {
+            const resp = await fetch(`${this.APP_URL}?surveyId=${encodeURIComponent(surveyId)}`);
+            const res = await resp.json();
+            if (res.status === 'success') {
+                this.currentDriveCount = res.totalCount || 0;
+                this.renderSyncedImages(surveyId, res.data || []);
+                this.updateStatus(surveyId);
+            } else {
+                this.updateStatus(surveyId);
+            }
+        } catch (e) {
+            console.error("Metadata fetch error:", e);
+            this.updateStatus(surveyId);
+        }
+    },
+
+    renderSyncedImages(surveyId, images) {
+        const sid = this._safeId(surveyId);
+        const gal = document.getElementById(`synced-gallery-${sid}`);
+        if (!gal) return;
+
+        gal.innerHTML = images.map(img => {
+            // Use the thumbnail endpoint for better direct embedding support
+            const url = `https://drive.google.com/thumbnail?id=${img.id}&sz=w1000`;
+            const date = new Date(img.timestamp).toLocaleString();
+            const meta = `Uploaded by: ${img.uploader}\nTime: ${date}`;
+            console.log("Rendering synced image:", img.name, url);
+            return `
+                    <div class="gallery-thumb synced" onclick="Gallery.open('${url}', '${surveyId}')" title="${meta}" style="position:relative; border:2px solid #10b981; overflow:hidden; background:#f8fafc;">
+                        <img src="${url}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='https://placehold.co/100x100?text=Private+Image'; console.warn('Image private or missing');">
+                        <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(16,185,129,0.9); color:white; font-size:9px; padding:2px 4px; font-weight:800; text-align:center; transform:translateY(0); transition:transform 0.2s;">
+                            SYNCED
+                        </div>
+                    </div>
+                `;
+        }).join('');
+    },
+
+    updateStatus(surveyId) {
+        const sid = this._safeId(surveyId);
+        const statusBadge = document.getElementById(`drive-status-${sid}`);
+        const syncBtn = document.getElementById('btn-sync-drive');
+        const camBtn = document.querySelector('.sync-action-btn.camera');
+
+        if (!statusBadge) return;
+
+        const syncedTotal = this.currentDriveCount;
+        const pendingTotal = this.files.length;
+
+        if (syncedTotal > 0 || pendingTotal > 0) {
+            statusBadge.innerText = `${syncedTotal} Synced${pendingTotal > 0 ? ` + ${pendingTotal} Pending` : ''}`;
+            statusBadge.style.color = "var(--primary)";
+            statusBadge.style.background = "#eff6ff";
+            statusBadge.style.borderColor = "#dbeafe";
+        } else {
+            statusBadge.innerText = "No Images Synced";
+            statusBadge.style.color = "#64748b";
+            statusBadge.style.background = "#f8fafc";
+            statusBadge.style.borderColor = "#e2e8f0";
+        }
+
+        if (syncBtn) syncBtn.disabled = (this.files.length === 0);
+        if (camBtn) camBtn.disabled = false; // Always enabled now
+    },
+
+    // Legacy compatibility: ensure background calls don't crash
+    updateHub() { this.updateStatus(State.filtered[State.currentIdx][0]); },
+
+    handleFiles(fileList) {
+        const newFiles = Array.from(fileList);
+        this.files = [...this.files, ...newFiles];
+        this.renderPreview();
+        this.updateStatus(State.filtered[State.currentIdx][0]);
+    },
+
+    renderPreview() {
+        const container = document.getElementById('drive-preview');
+        const syncBtn = document.getElementById('btn-sync-drive');
+        if (!container) return;
+
+        if (this.files.length === 0) {
+            container.style.display = 'none';
+            if (syncBtn) syncBtn.disabled = true;
+            return;
+        }
+
+        container.style.display = 'flex';
+        if (syncBtn) syncBtn.disabled = false;
+
+        container.innerHTML = this.files.map((f, i) => `
+                <div class="preview-item">
+                    <img src="${URL.createObjectURL(f)}">
+                    <button class="remove-btn" onclick="DriveSync.remove(${i})">
+                        <span class="material-icons-round" style="font-size:12px;">close</span>
+                    </button>
+                </div>
+            `).join('');
+    },
+
+    remove(idx) {
+        this.files.splice(idx, 1);
+        this.renderPreview();
+        this.updateStatus(State.filtered[State.currentIdx][0]);
+    },
+
+    compressImage(file, maxWidth = 1024, quality = 0.6) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let { width, height } = img;
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    canvas.toBlob((blob) => {
+                        resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", { type: 'image/webp' }));
+                    }, 'image/webp', quality);
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    },
+
+    async upload(surveyId) {
+        const email = this.getEmail();
+        const btn = document.getElementById('btn-sync-drive');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-round rotate">sync</span> Processing...';
+
+        try {
+            // Parallelized Compression & Upload
+            const uploadPromises = this.files.map(async (file, i) => {
+                const compressed = await this.compressImage(file);
+                const base64 = await this.toBase64(compressed);
+                const name = `${surveyId}_img${this.currentDriveCount + i + 1}.webp`;
+
+                const response = await fetch(this.APP_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ name, data: base64, surveyId, email, timestamp: new Date().toISOString() })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                if (result.status === "error") throw new Error(result.message);
+                return result;
+            });
+
+            await Promise.all(uploadPromises);
+
+            alert(`Successfully synced ${this.files.length} images to Google Drive!`);
+            this.files = [];
+            this.renderPreview();
+            this.fetchMetadata(surveyId);
+        } catch (e) {
+            console.error("Upload error:", e);
+            let msg = e.message;
+            if (msg === "Failed to fetch") msg = "Check Connection or Blockers";
+            alert("Sync failed: " + msg);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    },
+
+    toBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
+        });
+    }
+};
+
+
+const LayerManager = {
+    activeLayers: [],
+    pendingSelections: new Set(),
+    activeTab: null,
+
+    _getFeatureColor(feature, palette) {
+        // Robust hashing using ID or Name
+        const idStr = (feature.properties.fid || feature.properties.name || 'Unnamed').toString();
+        let hash = 0;
+        for (let i = 0; i < idStr.length; i++) {
+            hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return palette[Math.abs(hash) % palette.length];
+    },
+
+    load(keysToLoad) {
+        this.clear();
+        const palette = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+            '#8b5cf6', '#ec4899', '#06b6d4', '#f97316',
+            '#14b8a6', '#6366f1'
+        ];
+
+        keysToLoad.forEach((key, index) => {
+            const [city, layerName] = key.split('|');
+            if (GEO_LAYERS[city] && GEO_LAYERS[city][layerName]) {
+                const layerColor = palette[index % palette.length];
+                const lowerLayer = layerName.toLowerCase();
+                const isWardLayer = lowerLayer.includes('urban_ward') || lowerLayer.includes('urban_uc');
+                const isCantonment = lowerLayer.includes('cantonment');
+
+                const layer = L.geoJSON(GEO_LAYERS[city][layerName], {
+                    layerKey: key,
+                    interactive: true,
+                    pane: 'kmlPane',
+                    style: (feature) => {
+                        let color = layerColor;
+                        if (isCantonment) {
+                            color = '#ef4444'; // Permanent Red for Cantonment
+                        } else if (isWardLayer && feature.properties) {
+                            color = this._getFeatureColor(feature, palette);
+                        }
+                        return {
+                            color: color, weight: 0, opacity: 0.8, dashArray: '5, 5',
+                            fillColor: color, fillOpacity: 0.15
+                        };
+                    },
+                    onEachFeature: (feature, layer) => {
+                        // Tooltips removed as requested
+                    }
+                }).addTo(State.map);
+                this.activeLayers.push(layer);
+            }
+        });
+    },
+
+    clear() {
+        this.activeLayers.forEach(l => State.map.removeLayer(l));
+        this.activeLayers = [];
+    },
+
+    initPendingState() {
+        this.pendingSelections = new Set();
+        this.activeLayers.forEach(l => {
+            if (l.options.layerKey) this.pendingSelections.add(l.options.layerKey);
+        });
+    },
+
+    showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast-msg';
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.classList.add('show'); }, 10);
+        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+    },
+
+    renderSettingsUI() {
+        const container = document.getElementById('settings-layers-container');
+        if (!container) return;
+
+        const kmlCities = Object.keys(GEO_LAYERS).sort();
+        const mainTabs = ['📊 Stats', '📍 Marker Limit'];
+
+        if (!this.activeTab) this.activeTab = '📊 Stats';
+
+        // Tab Grouping & Rendering (Unified Scrollable Row)
+        let tabsHtml = `<div class="settings-tabs-row">`;
+
+        // Core Tabs
+        mainTabs.forEach(tab => {
+            const isActive = this.activeTab === tab;
+            tabsHtml += `
+                    <button onclick="LayerManager.switchTab('${tab}')" class="settings-tab-btn ${isActive ? 'active' : ''}">
+                        ${tab}
+                    </button>`;
+        });
+
+        // City Tabs
+        kmlCities.forEach(city => {
+            const isActive = this.activeTab === city;
+            tabsHtml += `
+                    <button onclick="LayerManager.switchTab('${city}')" class="settings-tab-btn ${isActive ? 'active' : ''}">
+                        ${city}
+                    </button>`;
+        });
+        tabsHtml += `</div>`;
+
+        let contentHtml = '<div style="flex:1; overflow-y:auto; padding:24px; padding-bottom:100px;">';
+
+        if (this.activeTab === '📊 Stats') {
+            contentHtml += `
+                    <div style="background:#eff6ff; border-radius:16px; padding:20px; border:1px solid #dbeafe; box-shadow: 0 4px 12px rgba(37,99,235,0.05);">
+                         <h4 style="margin:0 0 16px 0; color:#1e40af; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px;">Data Coverage Overview</h4>
+                         <div style="grid-template-columns:1fr 1fr; display:grid; gap:12px;">
+                             <div style="background:white; padding:16px; border-radius:12px; text-align:center; grid-column:span 2; border:1px solid #dbeafe;">
+                                 <div style="font-size:10px; color:#64748b; font-weight:800; letter-spacing:1px;">TOTAL SURVEYS</div>
+                                 <div id="set-total-surveys" style="font-size:28px; font-weight:900; color:#1e293b; margin-top:4px;">0</div>
+                             </div>
+                             <div style="background:white; padding:12px; border-radius:12px; text-align:center; border:1px solid #dcfce7;">
+                                 <div style="font-size:9px; color:#16a34a; font-weight:800; letter-spacing:0.5px;">DOMESTIC</div>
+                                 <div id="set-total-domestic" style="font-size:20px; font-weight:900; color:#16a34a;">0</div>
+                             </div>
+                             <div style="background:white; padding:12px; border-radius:12px; text-align:center; border:1px solid #fef3c7;">
+                                 <div style="font-size:9px; color:#d97706; font-weight:800; letter-spacing:0.5px;">COMMERCIAL</div>
+                                 <div id="set-total-commercial" style="font-size:20px; font-weight:900; color:#d97706;">0</div>
+                             </div>
+                         </div>
+                    </div>
+                    <div style="margin-top:20px; padding:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; font-size:13px; color:#64748b; line-height:1.6;">
+                        This dashboard provides real-time statistics of the survey database. Use the 📍 <b>Marker Limit</b> tab if you need to adjust performance for large datasets.
+                    </div>`;
+            setTimeout(() => Settings.updateStats(), 50);
+        }
+        else if (this.activeTab === '📍 Marker Limit') {
+            const limit = State.markerLimit >= 999999 ? 'No Limit' : State.markerLimit.toLocaleString();
+            contentHtml += `
+                    <div style="padding:4px;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; background: #fff; padding:16px; border-radius:16px; border:1px solid #f1f5f9;">
+                            <div>
+                                <label style="font-weight:800; font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:4px;">Current Map Limit</label>
+                                <span style="font-weight:900; font-size:28px; color:var(--primary);">${limit === 'No Limit' ? '∞' : limit}</span>
+                            </div>
+                            <span class="material-icons-round" style="font-size:40px; color:#dbeafe;">speed</span>
+                        </div>
+                        <div style="font-size:12px; color:#64748b; margin-bottom:20px; line-height:1.5;">Higher limits allow visualizing more data but may impact performance on older mobile devices.</div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+                            <button onclick="Settings.setMarkerLimit(5000)" class="secondary-btn" style="margin:0; justify-content:center;">5,000</button>
+                            <button onclick="Settings.setMarkerLimit(10000)" class="secondary-btn" style="margin:0; justify-content:center;">10,000</button>
+                            <button onclick="Settings.setMarkerLimit(20000)" class="secondary-btn" style="margin:0; justify-content:center;">20,000</button>
+                            <button onclick="Settings.setMarkerLimit(50000)" class="secondary-btn" style="margin:0; justify-content:center;">50,000</button>
+                            <button onclick="Settings.setMarkerLimit(999999)" class="secondary-btn" style="margin:0; justify-content:center; grid-column: span 2; background:#f0f7ff; border-color:#dbeafe; color:#2563eb;">Show All Records</button>
+                        </div>
+                        
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="Settings.incrementMarkerLimit(-5000)" style="flex:1; padding:14px; border-radius:12px; border:1px solid #e2e8f0; background:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; color:#64748b;">
+                                <span class="material-icons-round" style="font-size:18px;">remove_circle_outline</span> -5K
+                            </button>
+                            <button onclick="Settings.incrementMarkerLimit(5000)" style="flex:1; padding:14px; border-radius:12px; border:1px solid #e2e8f0; background:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; color:#2563eb;">
+                                <span class="material-icons-round" style="font-size:18px;">add_circle_outline</span> +5K
+                            </button>
+                        </div>
+                    </div>`;
+        }
+        else {
+            // KML Cities Sections
+            const layers = GEO_LAYERS[this.activeTab] || {};
+            const sortedLayers = Object.keys(layers).sort();
+
+            if (sortedLayers.length === 0) {
+                contentHtml += '<div style="padding:60px 20px; text-align:center; color:#94a3b8;">' +
+                    '<span class="material-icons-round" style="font-size:48px; display:block; margin-bottom:12px; opacity:0.3;">layers_clear</span>' +
+                    'No boundary layers for this city.</div>';
+            } else {
+                contentHtml += `<div class="kml-grid">`;
+                sortedLayers.forEach(layerName => {
+                    const key = `${this.activeTab}|${layerName}`;
+                    const isChecked = this.pendingSelections.has(key);
+                    contentHtml += `
+                            <div class="multi-option ${isChecked ? 'selected' : ''}" onclick="LayerManager.toggleSelection('${key}')" 
+                                 style="padding:12px; margin:0; border:1px solid ${isChecked ? '#bfdbfe' : '#f1f5f9'}; border-radius:12px; 
+                                 display:flex; align-items:center; gap:10px; cursor:pointer; background:${isChecked ? '#eff6ff' : 'white'}; transition:all 0.2s;">
+                                <div style="width:20px; height:20px; border:1.5px solid ${isChecked ? '#2563eb' : '#cbd5e1'}; border-radius:6px; 
+                                            display:flex; align-items:center; justify-content:center; background:${isChecked ? '#2563eb' : 'transparent'};">
+                                    ${isChecked ? '<span class="material-icons-round" style="font-size:14px; color:white;">check</span>' : ''}
+                                </div>
+                                <span style="font-size:12px; font-weight:600; color:${isChecked ? '#1e40af' : '#64748b'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${layerName}</span>
+                            </div>`;
+                });
+                contentHtml += `</div>`;
+
+                contentHtml += `
+                        <div style="margin-top:24px; display:flex; gap:12px;">
+                            <button onclick="LayerManager.clearCity()" style="flex:1; padding:10px; font-size:11px; color:#64748b; font-weight:700; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                <span class="material-icons-round" style="font-size:16px;">clear_all</span> Uncheck City
+                            </button>
+                            <button onclick="LayerManager.clear()" style="flex:1; padding:10px; font-size:11px; color:#ef4444; font-weight:700; background:#fef2f2; border:1px solid #fee2e2; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                <span class="material-icons-round" style="font-size:16px;">delete_sweep</span> Clear All Map
+                            </button>
+                        </div>`;
+            }
+        }
+        contentHtml += '</div>';
+
+        // Re-Styled Footer
+        const isKmlTab = kmlCities.includes(this.activeTab);
+        const footerHtml = isKmlTab ? `
+                <div class="settings-footer">
+                     <button onclick="Settings.close()" style="flex:0.4; padding:12px; border-radius:12px; border:1px solid #e2e8f0; background:white; color:#64748b; font-weight:700; cursor:pointer;">Cancel</button>
+                     <button onclick="LayerManager.applySettings()" class="btn-primary" 
+                        style="flex:1; border-radius:12px; padding:12px; display:flex; justify-content:center; gap:10px; align-items:center; background:#2563eb; color:white; border:none; border-radius:12px; font-weight:700; cursor:pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.2);">
+                        <span class="material-icons-round" style="font-size:20px;">task_alt</span> Apply Boundary Layers
+                     </button>
+                </div>` : `
+                <div class="settings-footer" style="padding:12px 24px;">
+                    <div style="font-size:11px; color:#94a3b8; font-weight:600;">v6.0 Build • Super-App Core</div>
+                    <button onclick="Settings.close()" style="margin-left:auto; padding:8px 20px; border-radius:20px; border:1px solid #e2e8f0; background:white; font-weight:700; font-size:12px; cursor:pointer;">Close</button>
+                </div>`;
+
+        container.innerHTML = tabsHtml + contentHtml + footerHtml;
+    },
+
+    switchTab(city) {
+        this.activeTab = city;
+        this.renderSettingsUI();
+    },
+
+    toggleSelection(key) {
+        if (this.pendingSelections.has(key)) {
+            this.pendingSelections.delete(key);
+        } else {
+            this.pendingSelections.add(key);
+        }
+        this.renderSettingsUI();
+    },
+
+    applySettings() {
+        // Convert Set to Array and Load
+        const keys = Array.from(this.pendingSelections);
+        this.load(keys);
+
+        // Close Settings Modal
+        document.getElementById('modal-settings').style.display = 'none';
+        this.showToast(`Active Layers: ${keys.length}`);
+    },
+
+    clearCity() {
+        const city = this.activeTab;
+        for (let key of this.pendingSelections) {
+            if (key.startsWith(city + '|')) {
+                this.pendingSelections.delete(key);
+            }
+        }
+        this.renderSettingsUI();
+    }
+};
+
+
+
+// Attach Gallery Events
+const galVp = document.getElementById('gal-vp');
+galVp.addEventListener('mousedown', e => Gallery.onStart(e));
+galVp.addEventListener('mousemove', e => Gallery.onMove(e));
+galVp.addEventListener('touchstart', e => Gallery.onStart(e), { passive: false });
+galVp.addEventListener('touchmove', e => Gallery.onMove(e), { passive: false });
+galVp.addEventListener('wheel', e => Gallery.onWheel(e), { passive: false });
+galVp.addEventListener('click', e => Gallery.clickNav(e));
+galVp.addEventListener('dblclick', () => Gallery.reset());
+
+// Window level listeners to catch drag releases outside the viewport
+window.addEventListener('mouseup', () => Gallery.onEnd());
+window.addEventListener('touchend', () => Gallery.onEnd());
+window.addEventListener('mouseleave', () => Gallery.onEnd());
+
+
+
+const Sidebar = {
+    init() {
+        // Auto-close on map click for mobile
+        const mapC = document.getElementById('main-stage');
+        if (mapC) {
+            mapC.addEventListener('click', (e) => {
+                // Only if clicking map directly (not controls) and on mobile
+                if (window.innerWidth <= 768 &&
+                    document.getElementById('sidebar').classList.contains('open') &&
+                    !e.target.closest('.map-controls') &&
+                    !e.target.closest('.float-btn') &&
+                    !e.target.closest('.gal-btn')) {
+                    this.close();
+                }
+            });
+        }
+    },
+    toggle() {
+        const sb = document.getElementById('sidebar');
+        const btn = document.getElementById('sidebar-toggle');
+
+        if (window.innerWidth <= 768) {
+            sb.classList.toggle('open');
+            sb.classList.remove('collapsed');
+
+            // Toggle Info Card visibility
+            const card = document.getElementById('info-card');
+            if (card) {
+                if (sb.classList.contains('open')) card.classList.add('hidden');
+                else card.classList.remove('hidden');
+            }
+        } else {
+            sb.classList.toggle('collapsed');
+            sb.classList.remove('open');
+            if (btn) btn.classList.toggle('collapsed-toggle');
+
+            // Refresh map size after transition
+            setTimeout(() => {
+                if (State.map) State.map.invalidateSize({ animate: true });
+            }, 450);
+        }
+    },
+    toggleDesktop() { this.toggle(); }, // Keep for compatibility
+    close() {
+        const sb = document.getElementById('sidebar');
+        sb.classList.remove('open');
+        if (window.innerWidth > 768) sb.classList.add('collapsed');
+
+        const card = document.getElementById('info-card');
+        if (card) card.classList.remove('hidden');
+    }
+};
+
+const InfoCard = {
+    init() {
+        if (typeof RAW_DATA === 'undefined') return;
+
+        // 1. Calculate Stats
+        const total = RAW_DATA.length;
+        const byTehsil = {};
+
+        RAW_DATA.forEach(r => {
+            const tehsil = r[11]; // Tehsil Name
+            const type = r[3];    // 1=Com, 0=Dom
+
+            if (!byTehsil[tehsil]) byTehsil[tehsil] = { t: 0, d: 0, c: 0 };
+            byTehsil[tehsil].t++;
+            if (type === 1) byTehsil[tehsil].c++;
+            else byTehsil[tehsil].d++;
+        });
+
+        // 2. Build HTML
+        const isMin = document.getElementById('info-card').classList.contains('minimized');
+        const toggleIcon = isMin ? 'expand_more' : 'expand_less';
+        const headerStyle = isMin
+            ? 'display:flex; justify-content:space-between; align-items:center;'
+            : 'padding-bottom:12px; border-bottom:1px solid #f1f5f9; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;';
+
+        let html = `
+                <div style="${headerStyle}">
+                    <div>
+                        <div style="font-size:10px; color:#64748b; font-weight:800; letter-spacing:1px; text-transform:uppercase; margin-bottom:4px;">${isMin ? '' : 'Total Surveys'}</div>
+                        <div style="font-size:24px; font-weight:800; color:var(--primary); line-height:1;">${total.toLocaleString()}</div>
+                    </div>
+                    <button onclick="InfoCard.toggle()" style="background:none; border:none; cursor:pointer; color:#94a3b8; padding:4px;">
+                        <span class="material-icons-round">${toggleIcon}</span>
+                    </button>
+                </div>
+                <div id="info-content" style="flex:1; overflow-y:auto; padding-right:4px; display:${isMin ? 'none' : 'block'}">
+            `;
+
+        // Sort Tehsils by count
+        const sorted = Object.entries(byTehsil).sort((a, b) => b[1].t - a[1].t);
+
+        sorted.forEach(([name, data]) => {
+            html += `
+                    <div class="info-stat-row">
+                        <div class="info-label">${name}</div>
+                        <div class="info-val">
+                           <span class="pill dom" title="Domestic">Dom: ${data.d}</span>
+                           <span class="pill com" title="Commercial">Com: ${data.c}</span>
+                           <span style="min-width:30px; text-align:right;">${data.t}</span>
+                        </div>
+                    </div>
+                `;
+        });
+
+        html += `</div>`;
+        document.getElementById('info-card').innerHTML = html;
+    },
+
+    toggle() {
+        const card = document.getElementById('info-card');
+        card.classList.toggle('minimized');
+        this.init(); // Re-render to update icon/content
+    }
+};
+
+const Settings = {
+    open() {
+        try {
+            if (typeof LayerManager !== 'undefined') {
+                LayerManager.initPendingState();
+                LayerManager.renderSettingsUI();
+            }
+        } catch (e) { console.error("LayerManager error:", e); }
+        document.getElementById('modal-settings').style.display = 'flex';
+    },
+
+    updateStats() {
+        if (typeof RAW_DATA === 'undefined') return;
+        const total = RAW_DATA.length;
+        // Type 1 = Commercial, Others = Domestic
+        const comm = RAW_DATA.filter(r => r[3] === 1).length;
+        const dom = total - comm;
+
+        const elTotal = document.getElementById('set-total-surveys');
+        const elDom = document.getElementById('set-total-domestic');
+        const elComm = document.getElementById('set-total-commercial');
+
+        if (elTotal) elTotal.innerText = total.toLocaleString();
+        if (elDom) elDom.innerText = dom.toLocaleString();
+        if (elComm) elComm.innerText = comm.toLocaleString();
+    },
+
+    close() {
+        document.getElementById('modal-settings').style.display = 'none';
+    },
+
+    setMarkerLimit(limit) {
+        State.markerLimit = limit;
+        LayerManager.renderSettingsUI();
+        App.render();
+    },
+
+    incrementMarkerLimit(amount) {
+        State.markerLimit = Math.max(5000, State.markerLimit + amount);
+        LayerManager.renderSettingsUI();
+        App.render();
+    }
+};
+
+// Keyboard support for List View
+window.addEventListener('keydown', e => {
+    if (!document.getElementById('list-view-stage').classList.contains('active')) return;
+    // Block List View navigation if Gallery is active
+    if (document.getElementById('gallery').classList.contains('active')) return;
+
+    if (e.key === 'ArrowRight') ListView.next();
+    if (e.key === 'ArrowLeft') ListView.prev();
+});
+
+// Touch support for List View
+let touchStartX = 0;
+let touchStartY = 0;
+document.getElementById('lv-content').addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+}, { passive: true });
+
+document.getElementById('lv-content').addEventListener('touchend', e => {
+    const deltaX = touchStartX - e.changedTouches[0].screenX;
+    const deltaY = touchStartY - e.changedTouches[0].screenY;
+
+    // Threshold check (increase to 100px) and Axis check (ensure horizontal dominance)
+    if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+        deltaX > 0 ? ListView.next() : ListView.prev();
+    }
+}, { passive: true });
+
+const PerformanceLog = {
+    customStartDate: null,
+
+    updateDate(val) {
+        this.customStartDate = val;
+        this.open();
+    },
+
+    open() {
+        // 1. Setup Dates
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+
+        // Default to 1st of current month if not set
+        if (!this.customStartDate) {
+            this.customStartDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        }
+
+        // Update input if exists
+        const dateInput = document.getElementById('att-start-date');
+        if (dateInput) dateInput.value = this.customStartDate;
+
+        const startStr = this.customStartDate;
+        const monthName = new Date(startStr).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        // 2. Aggregate Data by Staff -> Date
+        const staffData = {};
+
+        RAW_DATA.forEach(r => {
+            const staff = r[6], d = r[7];
+            if (d < startStr || d > todayStr) return;
+
+            if (!staffData[staff]) staffData[staff] = {};
+            if (!staffData[staff][d]) staffData[staff][d] = [];
+            staffData[staff][d].push(r);
+        });
+
+        // 3. Process Monthly Stats per Staff
+        const summary = [];
+
+        Object.keys(staffData).forEach(name => {
+            const dates = Object.keys(staffData[name]).sort();
+            let daysActive = dates.length;
+            let targetMet = 0;
+            let pmMet = 0;
+            let workflowMet = 0;
+            let absents = 0;
+
+            dates.forEach(d => {
+                const recs = staffData[name][d].sort((a, b) => a[8].localeCompare(b[8]));
+                const total = recs.length;
+
+                // PM Count (14:00 - 16:55)
+                const pmCount = recs.filter(r => r[8] >= "14:00:00" && r[8] <= "16:55:00").length;
+
+                // Idle Count
+                let idleCount = 0;
+                const winStart = "10:00:00", winEnd = "16:55:00";
+                for (let i = 1; i < recs.length; i++) {
+                    const t1 = recs[i - 1][8], t2 = recs[i][8];
+                    if (t1 < winStart || t1 > winEnd) continue;
+
+                    const d1 = new Date(`2000-01-01T${t1}`), d2 = new Date(`2000-01-01T${t2}`);
+                    let diff = (d2 - d1) / 60000;
+
+                    // Lunch correction
+                    const lS = new Date(`2000-01-01T13:00:00`), lE = new Date(`2000-01-01T14:00:00`);
+                    const oS = new Date(Math.max(d1, lS)), oE = new Date(Math.min(d2, lE));
+                    if (oE > oS) diff -= (oE - oS) / 60000;
+
+                    if (diff > 30) idleCount++;
+                }
+
+                // Check Rules
+                const ruleTarget = total >= 100;
+                const rulePM = pmCount >= 30;
+                const ruleIdle = idleCount <= 3;
+
+                if (ruleTarget) targetMet++;
+                if (rulePM) pmMet++;
+                if (ruleIdle) workflowMet++;
+
+                // If Fails ALL 3 -> Absent
+                if (!ruleTarget && !rulePM && !ruleIdle) absents++;
+            });
+
+            summary.push({ name, daysActive, targetMet, pmMet, workflowMet, absents });
+        });
+
+        // Sort by Absents (desc) then Name
+        summary.sort((a, b) => b.absents - a.absents || a.name.localeCompare(b.name));
+
+        // 4. Render HTML
+        if (document.getElementById('log-subtitle')) {
+            document.getElementById('log-subtitle').innerText = `Summary • ${startStr} to Present`;
+        }
+
+        let html = `
+                <div class="guide-box">
+                    <h4>Performance Summary</h4>
+                    <div style="font-size:12px; color:#64748b; margin-bottom:8px;">
+                        Showing stats from <b>${startStr}</b> to <b>${todayStr}</b>.
+                        <br><b>Absence</b> = Days failing all 3 rules (Target < 100, PM < 30, Idle > 3).
+                    </div>
+                </div>
+                <table class="perf-table" style="width:100%; border-collapse:collapse; font-size:13px; min-width:600px;">
+                <thead style="background:#f8fafc; position:sticky; top:0; z-index:20;">
+                    <tr>
+                        <th style="padding:12px; text-align:left;">Staff Name</th>
+                        <th style="padding:12px; text-align:center;">Days Active</th>
+                        <th style="padding:12px; text-align:center;">Target Met (Days)</th>
+                        <th style="padding:12px; text-align:center;">PM Rule Met (Days)</th>
+                        <th style="padding:12px; text-align:center;">Workflow Met (Days)</th>
+                        <th style="padding:12px; text-align:center;">Total Absents</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        summary.forEach(r => {
+            const absDisplay = r.absents > 0
+                ? `<span style="color:var(--danger); font-weight:800; font-size:15px;">-${r.absents} Days</span>`
+                : '<span style="color:#cbd5e1">-</span>';
+
+            html += `<tr class="rank-row">
+                    <td style="padding:12px;">
+                        <div style="font-weight:700">${r.name}</div>
+                    </td>
+                    <td style="padding:12px; text-align:center;">
+                        <b>${r.daysActive}</b>
+                    </td>
+                    <td style="padding:12px; text-align:center;">
+                        <span style="color:${r.targetMet === r.daysActive ? 'var(--primary)' : 'var(--text)'}">${r.targetMet}</span>
+                        <span style="color:#94a3b8; font-size:10px;">/ ${r.daysActive}</span>
+                    </td>
+                    <td style="padding:12px; text-align:center;">
+                        <span style="color:${r.pmMet === r.daysActive ? 'var(--primary)' : 'var(--text)'}">${r.pmMet}</span>
+                        <span style="color:#94a3b8; font-size:10px;">/ ${r.daysActive}</span>
+                    </td>
+                    <td style="padding:12px; text-align:center;">
+                        <span style="color:${r.workflowMet === r.daysActive ? 'var(--primary)' : 'var(--text)'}">${r.workflowMet}</span>
+                        <span style="color:#94a3b8; font-size:10px;">/ ${r.daysActive}</span>
+                    </td>
+                    <td style="padding:12px; text-align:center;">
+                        ${absDisplay}
+                    </td>
+                </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById('log-body').innerHTML = html;
+        document.getElementById('modal-log').style.display = 'flex';
+    },
+    close() { document.getElementById('modal-log').style.display = 'none'; }
+};
+
+
+
+const BillVerifier = {
+    URL: 'https://suthra.punjab.gov.pk/verify-bill',
+    open(psid = '') {
+        const modal = document.getElementById('modal-verify-bill');
+        const iframe = document.getElementById('verify-iframe');
+        const loader = document.getElementById('verify-loader');
+        const label = document.getElementById('verify-psid-label');
+
+        label.innerText = psid ? `VERIFYING PSID: ${psid}` : 'EXTERNAL: SUTHRA PUNJAB';
+        loader.style.display = 'flex';
+        iframe.src = this.URL;
+        modal.style.display = 'flex';
+
+        if (psid) {
+            console.log("Tip: Copy PSID", psid, "to verify on the portal.");
+
+            const copySuccess = () => {
+                App.showToast ? App.showToast("PSID Copied! Click portal & Paste (Ctrl+V)") : console.log("PSID Copied");
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(psid).then(copySuccess).catch(() => {
+                    // If clipboard API fails, try fallback
+                    this.fallbackCopy(psid);
+                    copySuccess();
+                });
+            } else {
+                this.fallbackCopy(psid);
+                copySuccess();
+            }
+        }
+    },
+    fallbackCopy(text) {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";  // Avoid scrolling to bottom
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            return successful;
+        } catch (err) {
+            console.error('Fallback copy failed', err);
+            return false;
+        }
+    },
+    close() {
+        const modal = document.getElementById('modal-verify-bill');
+        const iframe = document.getElementById('verify-iframe');
+        iframe.src = ''; // Clear src to stop loading
+        modal.style.display = 'none';
+        // Return to origin if applicable
+        if (State.originView === 'dashboard') ViewSwitcher.toDashboard();
+    }
+};
+const PaidBills = {
+    data: [],
+    filtered: [],
+    currentPage: 1,
+    rowsPerPage: 10,
+    activeType: 'all',
+    idStatus: 'all',
+    _fpStart: null,
+    _fpEnd: null,
+
+    setType(type) {
+        this.activeType = (this.activeType === type) ? 'all' : type;
+        this.currentPage = 1;
+        this.render();
+    },
+
+    init() {
+        const selector = document.getElementById('pb-city');
+        const typeSelector = document.getElementById('pb-type');
+        if (!selector) return;
+
+        // 1. Clear and Populate selectors
+        selector.innerHTML = '<option value="all">All Cities</option>';
+        typeSelector.innerHTML = '<option value="all">All Categories</option>';
+
+        const cities = new Set();
+        const categories = new Set();
+        PAID_DATA.forEach(r => {
+            if (r[3] && r[3] !== '-') cities.add(r[3]);
+            if (r[7] && r[7] !== '-') categories.add(r[7]);
+        });
+        Array.from(cities).sort().forEach(city => {
+            const opt = document.createElement('option');
+            opt.value = city; opt.innerText = city;
+            selector.appendChild(opt);
+        });
+        Array.from(categories).sort().forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat; opt.innerText = cat;
+            typeSelector.appendChild(opt);
+        });
+        selector.value = 'all';
+        typeSelector.value = 'all';
+
+        // 2. Initialize Flatpickr
+        const commonCfg = {
+            dateFormat: "Y-m-d",
+            onChange: () => this.render(),
+            disableMobile: false
+        };
+        this._fpStart = flatpickr("#pb-date-start", commonCfg);
+        this._fpEnd = flatpickr("#pb-date-end", commonCfg);
+    },
+
+    open() {
+        if (!this._fpStart) this.init();
+
+        if (!document.getElementById('pb-date-start').value) {
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+            this._fpStart.setDate(today);
+            this._fpEnd.setDate(today);
+        }
+
+        this.currentPage = 1;
+        this.render();
+        ViewSwitcher.toDashboard();
+    },
+
+    render() {
+        const start = document.getElementById('pb-date-start').value;
+        const end = document.getElementById('pb-date-end').value;
+        const city = document.getElementById('pb-city').value;
+        const category = document.getElementById('pb-type').value;
+        const idStatus = document.getElementById('pb-id-status')?.value || 'all';
+        const tbody = document.getElementById('pb-table-body');
+
+        // 1. Filter PAID_DATA
+        this.filtered = PAID_DATA.filter(r => {
+            const rSID = r[1];
+            const rDate = r[11]; // Paid Date
+            const rCity = r[3];
+            const rCat = r[7];
+
+            if (start && rDate < start) return false;
+            if (end && rDate > end) return false;
+            if (city !== 'all' && rCity !== city) return false;
+            if (category !== 'all' && rCat !== category) return false;
+
+            // ID Status Filter
+            if (idStatus === 'deleted' && rSID !== 'Deleted ID') return false;
+            if (idStatus === 'active' && rSID === 'Deleted ID') return false;
+
+            // Type Quick Filters (Domestic / Commercial)
+            if (this.activeType === 'domestic' && !rCat.toUpperCase().includes('DOMESTIC')) return false;
+            if (this.activeType === 'commercial' && !rCat.toUpperCase().includes('COMMERCIAL')) return false;
+
+            return true;
+        });
+
+        // 2. Filtered Stats (Reflect CURRENT results)
+        let filteredAmount = 0;
+        this.filtered.forEach(r => filteredAmount += parseFloat(r[12]) || 0);
+
+        document.getElementById('pb-total-amount').innerText = `Rs. ${filteredAmount.toLocaleString()}`;
+        document.getElementById('pb-total-count').innerText = this.filtered.length.toLocaleString();
+        document.getElementById('pb-avg-amount').innerText = this.filtered.length ? `Rs. ${Math.round(filteredAmount / this.filtered.length).toLocaleString()}` : 'Rs. 0';
+
+        // 3. Pagination Slicing
+        const totalRecords = this.filtered.length;
+        const totalPages = Math.ceil(totalRecords / this.rowsPerPage) || 1;
+        if (this.currentPage > totalPages) this.currentPage = totalPages;
+        if (this.currentPage < 1) this.currentPage = 1;
+
+        const startIdx = (this.currentPage - 1) * this.rowsPerPage;
+        const pageData = this.filtered.slice(startIdx, startIdx + parseInt(this.rowsPerPage));
+
+        // 4. Render Table Rows
+        if (pageData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:60px; color:#94a3b8;">
+                    <span class="material-icons-round" style="font-size:48px; opacity:0.2; display:block; margin-bottom:10px;">search_off</span>
+                    No records found for the selected criteria.
+                    <br><small>Global Registry contains ${PAID_DATA.length} records.</small>
+                </td></tr>`;
+        } else {
+            tbody.innerHTML = pageData.map(r => {
+                const sid = r[1];
+                const sidDisplay = sid === "Deleted ID" ? `<span class="paid-deleted-id">Deleted ID</span>` : `<span class="paid-id-link">#${sid}</span>`;
+
+                return `
+                        <tr onclick="PaidBills.jumpToRecord('${sid}')">
+                            <td data-label="Sr#">${r[0]}</td>
+                            <td data-label="Survey ID">${sidDisplay}</td>
+                            <td data-label="PSID" style="font-family:monospace; font-weight:700; color:#475569;">${r[2]}</td>
+                            <td data-label="City">${r[3]}</td>
+                            <td data-label="Month">${r[4]}</td>
+                            <td data-label="Office">${r[5]}</td>
+                            <td data-label="Area">${r[6]}</td>
+                            <td data-label="Category" style="font-size:11px; font-weight:700; color:#64748b;">${r[7]}</td>
+                            <td data-label="Due Amount">Rs. ${parseFloat(r[8]).toLocaleString()}</td>
+                            <td data-label="Fine">Rs. ${parseFloat(r[9]).toLocaleString()}</td>
+                            <td data-label="Channel" style="font-size:11px; font-weight:700; color:#64748b;">${r[10]}</td>
+                            <td data-label="Paid Date" style="font-weight:600;">${r[11]}</td>
+                            <td data-label="Paid Amount" style="font-weight:800; color:#16a34a;">Rs. ${parseFloat(r[12]).toLocaleString()}</td>
+                        </tr>
+                    `;
+            }).join('');
+        }
+
+        // 5. Update Footer
+        const endIdx = Math.min(startIdx + parseInt(this.rowsPerPage), totalRecords);
+        document.getElementById('pb-record-range').innerText = totalRecords ? `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}` : 'Showing 0-0';
+        document.getElementById('pb-page-info').innerText = `Page ${this.currentPage} of ${totalPages}`;
+        document.getElementById('pb-prev').disabled = this.currentPage <= 1;
+        document.getElementById('pb-next').disabled = this.currentPage >= totalPages;
+
+        // 5.5 Update Button Visual States
+        document.querySelectorAll('.dash-type-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-type') === this.activeType);
+        });
+        const allBtn = document.getElementById('pb-all-records-btn');
+        if (allBtn) allBtn.classList.toggle('active', this.activeType === 'all');
+
+        // 6. Sidebar Analytics (UC and Category breakdown)
+        this.renderAnalyticPanels();
+    },
+
+    renderAnalyticPanels() {
+        // UC Breakdown (Left)
+        const ucMap = {}; // { UC: { amount, count } }
+        this.filtered.forEach(r => {
+            const uc = r[6] || 'Unassigned';
+            if (!ucMap[uc]) ucMap[uc] = { amt: 0, count: 0 };
+            ucMap[uc].amt += parseFloat(r[12]) || 0;
+            ucMap[uc].count++;
+        });
+
+        const ucSorted = Object.entries(ucMap).sort((a, b) => b[1].amt - a[1].amt);
+        const ucList = document.getElementById('pb-uc-summary');
+        ucList.innerHTML = ucSorted.map(([name, data], idx) => {
+            const isTop5 = idx < 5;
+            const badge = isTop5 ? `<span class="top-5-badge">#${idx + 1} TOP PERFORMANCE</span>` : "";
+            return `
+                    <div class="analytics-item">
+                        <div style="flex:1">
+                            <div class="name">${name}</div>
+                            ${badge}
+                        </div>
+                        <div class="value">
+                            <div>Rs. ${Math.round(data.amt).toLocaleString()}</div>
+                            <div class="sub">${data.count} Bills</div>
+                        </div>
+                    </div>
+                `;
+        }).join('');
+
+        // Category Breakdown (Right)
+        const catMap = {};
+        this.filtered.forEach(r => {
+            const cat = r[7] || 'Other';
+            if (!catMap[cat]) catMap[cat] = { amt: 0, count: 0 };
+            catMap[cat].amt += parseFloat(r[12]) || 0;
+            catMap[cat].count++;
+        });
+
+        const catSorted = Object.entries(catMap).sort((a, b) => b[1].amt - a[1].amt);
+        const catList = document.getElementById('pb-category-summary');
+        catList.innerHTML = catSorted.map(([name, data]) => `
+                <div class="analytics-item">
+                    <div class="name" style="font-size:11px">${name}</div>
+                    <div class="value">
+                        <div style="color:var(--primary)">Rs. ${Math.round(data.amt).toLocaleString()}</div>
+                        <div class="sub">${data.count} Bills</div>
+                    </div>
+                </div>
+            `).join('');
+    },
+
+    setRows(val) {
+        this.rowsPerPage = parseInt(val);
+        this.currentPage = 1;
+        this.render();
+    },
+
+    changePage(delta) {
+        this.currentPage += delta;
+        this.render();
+        document.querySelector('.paid-table-container').scrollTop = 0;
+    },
+
+    jumpToRecord(id) {
+        if (id === "Deleted ID" || !id) {
+            App.showToast ? App.showToast("Record not available.") : alert("Record missing");
+            return;
+        }
+        // IMMEDIATE V7.3.5 FIX: FORCE HIDE STAGE
+        const stage = document.getElementById('paid-dashboard-stage');
+        if (stage) stage.style.display = 'none';
+
+        State.originView = 'dashboard';
+        ListView.jumpFromMap(id);
+    },
+
+    toggleSidebar() {
+        const layout = document.getElementById('dash-layout');
+        const sidebar = document.getElementById('dash-sidebar');
+        layout.classList.toggle('sidebar-collapsed');
+        sidebar.classList.toggle('active');
+    },
+
+    reset() {
+        document.getElementById('pb-city').value = 'all';
+        document.getElementById('pb-type').value = 'all';
+        const statusEl = document.getElementById('pb-id-status');
+        if (statusEl) statusEl.value = 'all';
+        this.activeType = 'all';
+
+        if (this._fpStart) this._fpStart.clear();
+        if (this._fpEnd) this._fpEnd.clear();
+        this.currentPage = 1;
+        this.render();
+    },
+
+    close() {
+        ViewSwitcher.toMap();
+        Sidebar.close();
+    }
+};
+const PremiumSelect = {
+    init(id, options, defaultLabel, onChange) {
+        const container = document.getElementById(id);
+        if (!container) return;
+
+        container.innerHTML = `
+                <div class="custom-select-wrapper" id="${id}-wrapper">
+                    <div class="custom-select-trigger">
+                        <span class="trigger-text">${defaultLabel}</span>
+                        <span class="material-icons-round">expand_more</span>
+                    </div>
+                    <div class="custom-select-options">
+                        <div class="option-item active" data-value="all">${defaultLabel}</div>
+                        ${options.map(opt => `<div class="option-item" data-value="${opt}">${opt}</div>`).join('')}
+                    </div>
+                </div>
+            `;
+
+        const wrapper = container.querySelector('.custom-select-wrapper');
+        const trigger = wrapper.querySelector('.custom-select-trigger');
+
+        trigger.onclick = (e) => {
+            e.stopPropagation();
+            const isOpen = wrapper.classList.contains('open');
+            document.querySelectorAll('.custom-select-wrapper').forEach(el => el.classList.remove('open'));
+            if (!isOpen) wrapper.classList.add('open');
+        };
+
+        wrapper.querySelectorAll('.option-item').forEach(item => {
+            item.onclick = (e) => {
+                e.stopPropagation();
+                const val = item.getAttribute('data-value');
+                wrapper.querySelector('.trigger-text').innerText = item.innerText;
+                wrapper.classList.remove('open');
+
+                wrapper.querySelectorAll('.option-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                if (onChange) onChange(val);
+            };
+        });
+
+        if (!window._psGlobal) {
+            document.addEventListener('click', () => {
+                document.querySelectorAll('.custom-select-wrapper').forEach(el => el.classList.remove('open'));
+            });
+            window._psGlobal = true;
+        }
+    },
+    getValue(id) {
+        const wrapper = document.getElementById(`${id}-wrapper`);
+        if (!wrapper) return 'all';
+        const active = wrapper.querySelector('.option-item.active');
+        return active ? active.getAttribute('data-value') : 'all';
+    }
+};
+const UniversalSearch = {
+    _timeout: null,
+    _initDone: false,
+    _tehsils: [],
+    _mcucs: [],
+    _surveyors: [],
+
+    init(force = false) {
+        if (this._initDone && !force) return;
+        if (typeof RAW_DATA === 'undefined' || !RAW_DATA.length) return;
+
+        this._tehsils = [...new Set(RAW_DATA.map(r => r[11]))].filter(x => x).sort();
+        this._mcucs = [...new Set(RAW_DATA.map(r => r[12]))].filter(x => x).sort();
+        this._surveyors = [...new Set(RAW_DATA.map(r => r[6]))].filter(x => x).sort();
+
+        this.renderCustomSelects();
+        this._initDone = true;
+    },
+    renderCustomSelects() {
+        PremiumSelect.init('search-tehsil', this._tehsils, 'All Tehsils', (v) => this.onTehsilChange(v));
+        PremiumSelect.init('search-mcuc', this._mcucs, 'All Areas', () => this.performSearch(document.getElementById('universal-search-input').value));
+        PremiumSelect.init('search-surveyor', this._surveyors, 'All Surveyors', () => this.performSearch(document.getElementById('universal-search-input').value));
+    },
+    onTehsilChange(tehsil) {
+        if (tehsil === 'all') {
+            PremiumSelect.init('search-mcuc', this._mcucs, 'All Areas', () => this.performSearch(document.getElementById('universal-search-input').value));
+        } else {
+            const filteredMCs = [...new Set(RAW_DATA.filter(r => r[11] === tehsil).map(r => r[12]))].sort();
+            PremiumSelect.init('search-mcuc', filteredMCs, `Areas in ${tehsil}`, () => this.performSearch(document.getElementById('universal-search-input').value));
+        }
+        this.performSearch(document.getElementById('universal-search-input').value);
+    },
+    open() {
+        const modal = document.getElementById('modal-search');
+        modal.style.display = 'flex';
+        const input = document.getElementById('universal-search-input');
+        if (!this._initDone) this.init();
+        input.value = '';
+        input.focus();
+        this.renderResults([]);
+    },
+    close() {
+        document.getElementById('modal-search').style.display = 'none';
+    },
+    handleInput(val) {
+        if (this._timeout) clearTimeout(this._timeout);
+        this._timeout = setTimeout(() => this.performSearch(val), 200);
+    },
+    performSearch(query) {
+        const q = query.trim().toLowerCase();
+        const tehsilSub = PremiumSelect.getValue('search-tehsil');
+        const mcucSub = PremiumSelect.getValue('search-mcuc');
+        const surveyorSub = PremiumSelect.getValue('search-surveyor');
+
+        if (!q && tehsilSub === 'all' && mcucSub === 'all' && surveyorSub === 'all') {
+            this.renderResults([]);
+            return;
+        }
+
+        const selectedCats = Array.from(document.querySelectorAll('.search-cat:checked')).map(cb => cb.getAttribute('data-field'));
+        const isGlobal = selectedCats.length === 0;
+
+        const results = RAW_DATA.filter(r => {
+            const name = decodePII(r[4]);
+            const addr = decodePII(r[5]);
+            const psid = decodePII(r[15]);
+
+            if (tehsilSub !== 'all' && r[11] !== tehsilSub) return false;
+            if (mcucSub !== 'all' && r[12] !== mcucSub) return false;
+            if (surveyorSub !== 'all' && r[6] !== surveyorSub) return false;
+
+            if (!q) return true;
+
+            if (isGlobal) {
+                return (r[0] && r[0].toString().toLowerCase().includes(q)) ||
+                    (psid && psid.toString().toLowerCase().includes(q)) ||
+                    (name && name.toLowerCase().includes(q)) ||
+                    (addr && addr.toLowerCase().includes(q)) ||
+                    (r[6] && r[6].toLowerCase().includes(q)) ||
+                    (r[12] && r[12].toLowerCase().includes(q));
+            } else {
+                if (selectedCats.includes('id') && r[0] && r[0].toString().toLowerCase().includes(q)) return true;
+                if (selectedCats.includes('psid') && psid && psid.toString().toLowerCase().includes(q)) return true;
+                if (selectedCats.includes('name') && name && name.toLowerCase().includes(q)) return true;
+                if (selectedCats.includes('addr') && addr && addr.toLowerCase().includes(q)) return true;
+                if (selectedCats.includes('surveyor') && r[6] && r[6].toLowerCase().includes(q)) return true;
+                if (selectedCats.includes('mcuc') && r[12] && r[12].toLowerCase().includes(q)) return true;
+                return false;
+            }
+        }).slice(0, 50);
+
+        this.renderResults(results);
+    },
+    renderResults(results) {
+        const container = document.getElementById('search-results-list');
+        document.getElementById('search-count').innerText = `${results.length} RECORDS FOUND`;
+
+        if (results.length === 0) {
+            container.innerHTML = `
+                    <div style="text-align:center; padding:40px; color:#94a3b8;">
+                        <span class="material-icons-round" style="font-size:48px; opacity:0.3; margin-bottom:8px;">search_off</span>
+                        <div>No matching records found.</div>
+                    </div>
+                `;
+            return;
+        }
+
+        container.innerHTML = results.map(r => `
+                <div class="search-item" onclick="UniversalSearch.jump('${r[0]}', 'list')">
+                    <div class="search-item-main" style="flex:1; min-width:0;">
+                        <div class="search-item-title">#${r[0]} | ${decodePII(r[4])}</div>
+                        <div class="search-item-sub">${decodePII(r[15])} | ${decodePII(r[5])}</div>
+                        <span class="search-item-meta">${r[11]} - ${r[12]}</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end; flex-shrink:0;">
+                         <div style="display:flex; gap:6px;">
+                            <button class="float-btn" onclick="event.stopPropagation(); UniversalSearch.jump('${r[0]}', 'map')" title="Marker" style="width:75px; height:32px; border-radius:10px; background:#eff6ff; color:#2563eb; border:1.5px solid #dbeafe; display:flex; gap:6px; font-size:10px; font-weight:800; align-items:center; justify-content:center;">
+                                <span class="material-icons-round" style="font-size:16px;">place</span> MARKER
+                            </button>
+                            <button class="float-btn" onclick="event.stopPropagation(); UniversalSearch.jump('${r[0]}', 'list')" title="List" style="width:65px; height:32px; border-radius:10px; background:#f0fdf4; color:#16a34a; border:1.5px solid #dcfce7; display:flex; gap:6px; font-size:10px; font-weight:800; align-items:center; justify-content:center;">
+                                <span class="material-icons-round" style="font-size:16px;">list_alt</span> LIST
+                            </button>
+                         </div>
+                         <div class="search-badge">${r[6]}</div>
+                    </div>
+                </div>
+            `).join('');
+    },
+    jump(id, mode) {
+        this.close();
+        if (mode === 'map') {
+            ListView.showOnMap(id);
+        } else {
+            ListView.jumpFromMap(id);
+        }
+    }
+};
+
+
+
+// Expose Globals explicitly for inline event handlers and external access
+window.State = State;
+window.App = App;
+window.Sidebar = Sidebar;
+window.InfoCard = InfoCard;
+window.Settings = Settings;
+window.Gallery = Gallery;
+window.DriveSync = DriveSync;
+window.LayerManager = LayerManager || {};
+window.ViewSwitcher = ViewSwitcher;
+window.ListView = ListView;
+window.PerformanceLog = PerformanceLog;
+window.BillVerifier = BillVerifier;
+window.PaidBills = PaidBills;
+window.UniversalSearch = UniversalSearch;
+window.Stats = Stats;
+
+// Global Key Handlers
+document.addEventListener('keydown', (e) => {
+    // CMD+K or CTRL+K for Universal Search
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        UniversalSearch.open();
+    }
+
+    if (e.key === 'Escape') {
+        UniversalSearch.close();
+        PaidBills.close();
+        BillVerifier.close();
+        if (typeof Gallery !== 'undefined') Gallery.close();
+    }
+});
+
+
+window.onload = () => {
+    // App.init();
+
+    // Prevent Accidental Exit
+    window.addEventListener('beforeunload', (e) => {
+        e.preventDefault();
+        e.returnValue = ''; // Standard requirement for modern browsers
+    });
+
+    // Handle Mobile Back Button (Push a dummy state to history)
+    window.history.pushState({ page: 1 }, "", "");
+    window.onpopstate = function (event) {
+        if (confirm("Exit App? Unsaved progress (like selected filters) will be lost.")) {
+            window.history.back();
+        } else {
+            window.history.pushState({ page: 1 }, "", "");
+        }
+    };
+};
 
 </script>
 </body>
