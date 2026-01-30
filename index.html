@@ -65,6 +65,17 @@
             padding: 16px; background: white; border-bottom: 1px solid #e2e8f0;
         }
 
+        .map-nav {
+            position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 12px;
+            padding: 8px 16px; background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); z-index: 10002;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .map-nav-text { color: var(--text); font-weight: 700; font-size: 13px; white-space: nowrap; }
+
         .record-card {
             flex: 1; display: flex; flex-direction: column; padding: 0 24px 24px 24px;
             max-width: 600px; margin: 0 auto; width: 100%; overflow-y: auto;
@@ -1051,7 +1062,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 30-Jan 05:27 PM 
+                Updated: 30-Jan 06:22 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1275,6 +1286,11 @@
 </div>
 
 <div id="main-stage">
+    <div id="map-pager" class="map-nav" style="display: none;">
+        <button onclick="MapNavigator.move(-1)" class="gal-btn" style="width:32px; height:32px; background:white; color:var(--text); box-shadow:0 2px 4px rgba(0,0,0,0.05);"><span class="material-icons-round" style="font-size:20px;">chevron_left</span></button>
+        <span class="map-nav-text">Record <span id="map-nav-idx">0</span> of <span id="map-nav-total">0</span></span>
+        <button onclick="MapNavigator.move(1)" class="gal-btn" style="width:32px; height:32px; background:white; color:var(--text); box-shadow:0 2px 4px rgba(0,0,0,0.05);"><span class="material-icons-round" style="font-size:20px;">chevron_right</span></button>
+    </div>
     <button id="sidebar-toggle" onclick="Sidebar.toggleDesktop()" title="Toggle Sidebar">
         <i class="material-icons-round">keyboard_arrow_left</i>
     </button>
@@ -2594,6 +2610,7 @@
 
             this.render();
             this.updateSurveyors();
+            if(window.MapNavigator) MapNavigator.updateUI();
             
             // Universal Sync: Ensure List View stays in sync with sidebar updates
             if(typeof ListView !== 'undefined' && document.getElementById('list-view-stage')?.classList.contains('active')) {
@@ -2676,7 +2693,10 @@
                     App.updateSurveyors(r[6]);
                     // Synchronize context: update currentIdx to this record's position in the current list
                     const idx = State.filtered.findIndex(record => record[0].toString() === r[0].toString());
-                    if (idx !== -1) State.currentIdx = idx;
+                    if (idx !== -1) {
+                        State.currentIdx = idx;
+                        if(window.MapNavigator) MapNavigator.updateUI();
+                    }
                 });
                 
                 const imgs = r[9].map(url => `<img src="${url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="Gallery.open('${url}', '${r[0]}')">`).join('');
@@ -2792,6 +2812,7 @@
                 else if(statLabel && State.history.length === 0) statLabel.innerText = "Live Survey Data";
 
                 App.render(); 
+                if(window.MapNavigator) MapNavigator.updateUI();
                 return;
             }
 
@@ -3003,12 +3024,11 @@
             
             setTimeout(() => {
                 this.jumpToID(id);
-                // Background maintenance: Ensure any existing search input is updated
-                const input = document.getElementById('lv-search-id'); 
-                if(input) input.value = id;
-                // Synchronize context
                 const idx = State.filtered.findIndex(r => r[0].toString() === id.toString());
-                if (idx !== -1) State.currentIdx = idx;
+                if (idx !== -1) {
+                    State.currentIdx = idx;
+                    if(window.MapNavigator) MapNavigator.updateUI();
+                }
             }, 150);
         },
 
@@ -5177,7 +5197,10 @@
             this.close();
             // Synchronize context
             const idx = State.filtered.findIndex(r => r[0].toString() === id.toString());
-            if (idx !== -1) State.currentIdx = idx;
+            if (idx !== -1) {
+                State.currentIdx = idx;
+                if(window.MapNavigator) MapNavigator.updateUI();
+            }
 
             if (mode === 'map') {
                 ListView.showOnMap(id);
@@ -5207,6 +5230,19 @@
     window.Stats = Stats;
 
     const MapNavigator = {
+        updateUI() {
+            const pager = document.getElementById('map-pager');
+            if (!pager) return;
+            
+            if (!State.filtered || State.filtered.length <= 1) {
+                pager.style.display = 'none';
+                return;
+            }
+            
+            pager.style.display = 'flex';
+            document.getElementById('map-nav-idx').innerText = State.currentIdx + 1;
+            document.getElementById('map-nav-total').innerText = State.filtered.length;
+        },
         move(dir) {
             if (!State.filtered || State.filtered.length === 0) return;
             // Iterate within the current filtered set
@@ -5216,6 +5252,7 @@
             if (record) {
                 // Focus on map without isolating the record or clearing filters
                 ListView.showOnMap(record[0], false);
+                this.updateUI();
             }
         }
     };
