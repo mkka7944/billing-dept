@@ -1097,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 31-Jan 01:54 PM 
+                Updated: 31-Jan 01:59 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -5509,16 +5509,32 @@
             }
         },
         save() {
-            // Logic to send this to the Python generator for file-write
+            const name = prompt("Enter a name for this route:", "New Route");
+            if(!name) return;
+
             const routeData = {
-                name: prompt("Enter a name for this route:", "New Route"),
+                name: name,
                 points: this.points,
-                sequence: this.sequence.map(s => s.id)
+                sequence: this.sequence.map(s => s.id),
+                timestamp: new Date().toISOString()
             };
-            if(!routeData.name) return;
             
-            console.log("Saving Route:", routeData);
-            alert(`Route "${routeData.name}" saved! (Persistence will be finalized in the next sync).`);
+            // Add to local state for immediate feedback
+            if(!State.savedRoutes) State.savedRoutes = [];
+            State.savedRoutes.push(routeData);
+            this.renderSavedList();
+
+            // persistence: Download the entire routes.json file
+            const fullData = JSON.stringify(State.savedRoutes, null, 2);
+            const blob = new Blob([fullData], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'routes.json';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            alert(`Route "${name}" exported! \n\nTo persist this across builds, move the downloaded "routes.json" to your "01_Local_Engine/scripts/" folder and re-run the generator.`);
         },
         clear() {
             this.active = false;
