@@ -1097,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 31-Jan 01:59 PM 
+                Updated: 31-Jan 02:42 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1940,13 +1940,12 @@
                     status.innerText = 'Starting Application...';
                     setTimeout(() => {
                         loadingOverlay.remove();
+                        window.APP_DATA_LOADED = true;
                         if(window.App && window.App.init) {
                             window.App.init();
-                            // Role-Based Gating is handled in Auth.updateUI()
                             Auth.updateUI();
                         } else {
-                            console.error("App.init missing!");
-                            alert("Initialization Error: App logic not found.");
+                            console.log("Waiting for App logic to parse...");
                         }
                     }, 500);
                     
@@ -2088,6 +2087,8 @@
         },
 
         init() {
+            if(window.APP_INITIALIZED) return;
+            window.APP_INITIALIZED = true;
             this.initMap();
             this.initFilters();
             Sidebar.init();
@@ -5298,6 +5299,8 @@
     window.PaidBills = PaidBills;
     window.UniversalSearch = UniversalSearch;
     window.Stats = Stats;
+    window.SpatialRouter = SpatialRouter;
+    window.MapNavigator = MapNavigator;
 
     const SpatialRouter = {
         active: false,
@@ -5647,8 +5650,11 @@
 
 
     window.onload = () => {
-        // App.init();
-        if(typeof SpatialRouter !== 'undefined') SpatialRouter.init();
+        if(window.APP_DATA_LOADED && window.App && !window.APP_INITIALIZED) {
+            window.App.init();
+            Auth.updateUI();
+        }
+        if(window.SpatialRouter) SpatialRouter.init();
         
         // Prevent Accidental Exit
         window.addEventListener('beforeunload', (e) => {
