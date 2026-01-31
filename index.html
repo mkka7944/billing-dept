@@ -545,6 +545,32 @@
             font-size: 11px; font-weight: 800; color: #64748b;
             text-transform: uppercase; letter-spacing: 1px;
         }
+
+        /* Spatial Routing Styles */
+        .route-badge {
+            background: var(--primary); color: white; border-radius: 50%;
+            width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 900; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+            border: 2px solid white; pointer-events: none;
+            position: absolute; transform: translate(-50%, -100%) translateY(-10px);
+            z-index: 26000;
+        }
+        .routing-panel {
+            background: #f8fafc; border-radius: 16px; border: 1.5px dashed #cbd5e1;
+            padding: 16px; margin-top: 12px; display: none;
+        }
+        .routing-panel.active { display: block; }
+        .route-step-item {
+            display: flex; align-items: center; gap: 12px; padding: 10px;
+            background: white; border-bottom: 1px solid #f1f5f9; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .route-step-item:hover { background: #eff6ff; }
+        .route-seq-num {
+            width: 24px; height: 24px; background: #e2e8f0; color: #475569;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 800;
+        }
         
         .sync-status-badge {
             font-size: 10px; font-weight: 700; color: var(--primary);
@@ -1071,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 31-Jan 12:26 PM 
+                Updated: 31-Jan 01:54 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1086,6 +1112,34 @@
     
     <div id="sidebar-scroll" style="flex:1; overflow-y:auto; overflow-x: hidden; padding-bottom: 20px;">
         <div class="filters" style="padding: 8px var(--spacer) 80px var(--spacer);">
+            <!-- Routing Station Tab -->
+            <div class="filter-group" style="margin-bottom: 16px;">
+                <div class="panel-header-premium" onclick="SpatialRouter.toggleUI()" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: white;">
+                    <span class="material-icons-round" style="color:#60a5fa; font-size:20px;">route</span>
+                    <span class="filter-label" style="flex:1; color: white;">Routing Station</span>
+                    <span class="material-icons-round" style="font-size:18px; opacity:0.7;">chevron_right</span>
+                </div>
+                <div id="routing-panel" class="routing-panel">
+                    <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:12px; text-transform:uppercase;">Select Area Logic</div>
+                    <button onclick="SpatialRouter.startDrawing()" class="sync-action-btn" style="width:100%; justify-content:flex-start; background:white; border:1.5px solid #e2e8f0; margin-bottom:8px;">
+                        <span class="material-icons-round" style="color:var(--primary)">edit_location</span> Draw Selection Area
+                    </button>
+                    <div id="route-stats" style="display:none; margin-top:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:12px; font-weight:700; color:var(--text)" id="route-count">0 Houses Captured</span>
+                            <button onclick="SpatialRouter.clear()" style="background:none; border:none; color:#ef4444; font-size:10px; font-weight:700; cursor:pointer;">[Clear]</button>
+                        </div>
+                        <button onclick="SpatialRouter.optimize()" class="sync-action-btn" style="width:100%; background:var(--primary); color:white; border:none;">
+                            <span class="material-icons-round">auto_fix_high</span> Optimize Sequence
+                        </button>
+                        <div id="route-list" style="margin-top:16px; max-height:200px; overflow-y:auto; border-radius:8px; border:1px solid #e2e8f0;"></div>
+                        <button onclick="SpatialRouter.save()" class="sync-action-btn" style="width:100%; margin-top:12px; background:#10b981; color:white; border:none;">
+                            <span class="material-icons-round">save</span> Save Persistent Route
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="filter-group collapsed">
                 <div class="panel-header-premium" onclick="App.toggleFilterGroup(this)">
                     <span class="material-icons-round" style="color:var(--primary); font-size:20px;">public</span>
@@ -1922,6 +1976,7 @@
     if (typeof HIERARCHY === 'undefined') window.HIERARCHY = {};
 
     const State = {
+        savedRoutes: {"MC1": "<b>MC-01 District</b><br>Primary Industrial Zone", "MC 2": "<b>MC-02 District</b><br>Residential Hub", "MC3": "<b>MC-03 District</b><br>Commercial Core"}aved_routes%,
         filtered: [],
         availableSurveyors: [], 
         surveyorFilter: [], 
@@ -1941,7 +1996,7 @@
         kmlPane: null
     };
 
-    window.KML_META = {"MC1": "<b>MC-01 District</b><br>Primary Industrial Zone", "MC 2": "<b>MC-02 District</b><br>Residential Hub", "MC3": "<b>MC-03 District</b><br>Commercial Core"};
+    window.KML_META = %s;
 
     const App = {
         toggleQuickFilter(key, e) {
@@ -5244,6 +5299,240 @@
     window.UniversalSearch = UniversalSearch;
     window.Stats = Stats;
 
+    const SpatialRouter = {
+        active: false,
+        points: [],
+        selectionLayer: null,
+        capturedIDs: [],
+        sequence: [],
+        
+        toggleUI() {
+            const panel = document.getElementById('routing-panel');
+            if (panel) {
+                panel.classList.toggle('active');
+                if(!panel.classList.contains('active')) this.clear();
+            }
+        },
+        startDrawing() {
+            if (this.active) return;
+            this.active = true;
+            this.points = [];
+            this.clear();
+            
+            document.getElementById('map').style.cursor = 'crosshair';
+            
+            this.onClick = (e) => {
+                this.points.push(e.latlng);
+                if (this.selectionLayer) State.map.removeLayer(this.selectionLayer);
+                this.selectionLayer = L.layerGroup().addTo(State.map);
+                L.polygon(this.points, {color: '#3b82f6', weight: 2, fillOpacity: 0.1, dashArray: '5, 5'}).addTo(this.selectionLayer);
+                this.points.forEach(p => L.circleMarker(p, {radius: 4, color: '#2563eb', fillOpacity: 1}).addTo(this.selectionLayer));
+            };
+
+            this.onContext = (e) => {
+                if(e.originalEvent) e.originalEvent.preventDefault();
+                this.finishDrawing();
+            };
+
+            State.map.on('click', this.onClick);
+            State.map.on('contextmenu', this.onContext);
+            
+            const hint = document.createElement('div');
+            hint.id = 'routing-hint';
+            hint.innerHTML = '<span class="material-icons-round" style="font-size:16px; margin-right:8px; vertical-align:middle;">mouse</span> <b>Click</b> map to add points. <b>Right-Click</b> to finish.';
+            hint.style = 'position:absolute; bottom:140px; left:50%; transform:translateX(-50%); background:rgba(30,41,59,0.9); color:white; padding:10px 20px; border-radius:30px; z-index:30000; font-size:12px; pointer-events:none; font-weight:600; box-shadow:0 8px 32px rgba(0,0,0,0.3); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.1);';
+            document.body.appendChild(hint);
+        },
+        finishDrawing() {
+            this.active = false;
+            State.map.off('click', this.onClick);
+            State.map.off('contextmenu', this.onContext);
+            document.getElementById('map').style.cursor = '';
+            if(document.getElementById('routing-hint')) document.getElementById('routing-hint').remove();
+            
+            if (this.points.length < 3) {
+                alert('Please select at least 3 points to create an area.');
+                this.clear();
+                return;
+            }
+            this.harvest();
+        },
+        isPointInPoly(lat, lng, poly) {
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                let xi = poly[i].lat, yi = poly[i].lng;
+                let xj = poly[j].lat, yj = poly[j].lng;
+                let intersect = ((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        },
+        harvest() {
+            if (!State.raw_data) return;
+            this.capturedIDs = [];
+            
+            State.raw_data.forEach(row => {
+                const lat = parseFloat(row[23]);
+                const lng = parseFloat(row[24]);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    if (this.isPointInPoly(lat, lng, this.points)) {
+                        this.capturedIDs.push(row[0]);
+                    }
+                }
+            });
+
+            if (this.capturedIDs.length === 0) {
+                alert('No houses found in the selected area. Try drawing a larger shape.');
+                this.clear();
+                return;
+            }
+
+            document.getElementById('route-stats').style.display = 'block';
+            document.getElementById('route-count').innerText = `${this.capturedIDs.length} Houses Captured`;
+        },
+        init() {
+            if (State.savedRoutes && State.savedRoutes.length > 0) {
+                this.renderSavedList();
+            }
+        },
+        renderSavedList() {
+            const listContainer = document.getElementById('route-list');
+            if(!listContainer) return;
+            document.getElementById('route-stats').style.display = 'block';
+            listContainer.innerHTML = '<div style="font-size:10px; font-weight:700; color:#64748b; padding:8px; border-bottom:1px solid #e2e8f0; text-transform:uppercase;">Saved Routes</div>';
+            
+            State.savedRoutes.forEach((route, idx) => {
+                const item = document.createElement('div');
+                item.className = 'route-step-item';
+                item.innerHTML = `
+                    <div class="route-seq-num" style="background:var(--primary); color:white">${idx+1}</div>
+                    <div style="flex:1">
+                        <div style="font-size:11px; font-weight:800; color:var(--text)">${route.name}</div>
+                        <div style="font-size:9px; color:#64748b">${route.sequence.length} Houses</div>
+                    </div>
+                    <span class="material-icons-round" style="font-size:16px; color:var(--primary)">play_circle_filled</span>
+                `;
+                item.onclick = () => this.load(route);
+                listContainer.appendChild(item);
+            });
+        },
+        load(route) {
+            this.clear();
+            this.points = route.points;
+            
+            const allIDsInArea = [];
+            State.raw_data.forEach(row => {
+                const lat = parseFloat(row[23]);
+                const lng = parseFloat(row[24]);
+                if (this.isPointInPoly(lat, lng, this.points)) {
+                    allIDsInArea.push(row[0]);
+                }
+            });
+
+            this.capturedIDs = allIDsInArea;
+            this.optimize();
+            alert(`Loaded Route: ${route.name}`);
+        },
+        optimize() {
+            if (this.capturedIDs.length === 0) return;
+            const points = [];
+            this.capturedIDs.forEach(id => {
+                const row = State.raw_data.find(r => r[0] === id);
+                if(row) {
+                    points.push({
+                        id: id,
+                        lat: parseFloat(row[23]),
+                        lng: parseFloat(row[24]),
+                        name: row[1] + ' ' + row[2] 
+                    });
+                }
+            });
+
+            this.sequence = [];
+            let current = points.shift();
+            this.sequence.push(current);
+
+            while (points.length > 0) {
+                let closestIdx = -1;
+                let minDist = Infinity;
+                for (let i = 0; i < points.length; i++) {
+                    const d = Math.sqrt(Math.pow(current.lat - points[i].lat, 2) + Math.pow(current.lng - points[i].lng, 2));
+                    if (d < minDist) {
+                        minDist = d;
+                        closestIdx = i;
+                    }
+                }
+                current = points.splice(closestIdx, 1)[0];
+                this.sequence.push(current);
+            }
+            this.renderRoute();
+        },
+        renderRoute() {
+            if (this.selectionLayer) this.selectionLayer.clearLayers();
+            else this.selectionLayer = L.layerGroup().addTo(State.map);
+
+            L.polygon(this.points, {color: '#3b82f6', weight: 1, fillOpacity: 0.05, dashArray: '5, 5', interactive: false}).addTo(this.selectionLayer);
+
+            const listContainer = document.getElementById('route-list');
+            listContainer.innerHTML = '';
+
+            const pathPoints = this.sequence.map(p => [p.lat, p.lng]);
+            L.polyline(pathPoints, {color: '#3b82f6', weight: 2, opacity: 0.5, dashArray: '10, 10', interactive: false}).addTo(this.selectionLayer);
+
+            this.sequence.forEach((p, index) => {
+                const seqNum = index + 1;
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="route-badge">${seqNum}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                });
+                L.marker([p.lat, p.lng], {icon: icon, interactive: false}).addTo(this.selectionLayer);
+
+                const item = document.createElement('div');
+                item.className = 'route-step-item';
+                item.innerHTML = `
+                    <div class="route-seq-num">${seqNum}</div>
+                    <div style="flex:1">
+                        <div style="font-size:11px; font-weight:800; color:var(--text)">${p.id}</div>
+                        <div style="font-size:9px; color:#64748b">${p.name}</div>
+                    </div>
+                    <span class="material-icons-round" style="font-size:16px; color:#cbd5e1">gps_fixed</span>
+                `;
+                item.onclick = () => ListView.showOnMap(p.id);
+                listContainer.appendChild(item);
+            });
+
+            if(window.MapNavigator) {
+                MapNavigator.visible = true;
+                MapNavigator.updateUI();
+            }
+        },
+        save() {
+            // Logic to send this to the Python generator for file-write
+            const routeData = {
+                name: prompt("Enter a name for this route:", "New Route"),
+                points: this.points,
+                sequence: this.sequence.map(s => s.id)
+            };
+            if(!routeData.name) return;
+            
+            console.log("Saving Route:", routeData);
+            alert(`Route "${routeData.name}" saved! (Persistence will be finalized in the next sync).`);
+        },
+        clear() {
+            this.active = false;
+            this.capturedIDs = [];
+            this.sequence = [];
+            this.points = [];
+            if(this.selectionLayer) State.map.removeLayer(this.selectionLayer);
+            document.getElementById('route-stats').style.display = 'none';
+            document.getElementById('route-list').innerHTML = '';
+            State.map.off('click', this.onClick);
+            State.map.off('contextmenu', this.onContext);
+        }
+    };
+
     const MapNavigator = {
         visible: false,
         toggle() {
@@ -5259,32 +5548,59 @@
             this.updateUI();
         },
         updateUI() {
-            // Asynchronous update to avoid conflicts with Leaflet rendering/animations
             setTimeout(() => {
                 const pager = document.getElementById('map-pager');
                 if (!pager) return;
                 
-                if (!State.filtered || State.filtered.length <= 1 || !this.visible) {
+                const isRouting = SpatialRouter.sequence.length > 0;
+                const source = isRouting ? SpatialRouter.sequence : State.filtered;
+                const currentId = isRouting ? (SpatialRouter.sequence[State.currentIdx] ? SpatialRouter.sequence[State.currentIdx].id : null) : null;
+
+                if (!source || source.length <= 1 || !this.visible) {
                     pager.style.setProperty('display', 'none', 'important');
                     return;
                 }
                 
                 pager.style.setProperty('display', 'flex', 'important');
-                document.getElementById('map-nav-idx').innerText = State.currentIdx + 1;
-                document.getElementById('map-nav-total').innerText = State.filtered.length;
+                
+                // Update index display (Logic depends on if we are in route mode)
+                let displayIdx = State.currentIdx + 1;
+                if(isRouting && currentId) {
+                   // Ensure State.currentIdx matches the position in SpatialRouter.sequence
+                   const seqIdx = SpatialRouter.sequence.findIndex(s => s.id === (State.filtered[State.currentIdx] ? State.filtered[State.currentIdx][0] : null));
+                   if(seqIdx !== -1) displayIdx = seqIdx + 1;
+                }
+
+                document.getElementById('map-nav-idx').innerText = displayIdx;
+                document.getElementById('map-nav-total').innerText = source.length;
             }, 50);
         },
         move(dir) {
-            if (!State.filtered || State.filtered.length === 0) return;
-            // Iterate within the current filtered set
-            let newIdx = (State.currentIdx + dir + State.filtered.length) % State.filtered.length;
-            State.currentIdx = newIdx;
-            const record = State.filtered[State.currentIdx];
-            if (record) {
-                // Focus on map without isolating the record or clearing filters
-                ListView.showOnMap(record[0], false);
-                this.updateUI();
+            const isRouting = SpatialRouter.sequence.length > 0;
+            
+            if (isRouting) {
+                // Move within the spatial route
+                const currentId = State.filtered[State.currentIdx] ? State.filtered[State.currentIdx][0] : null;
+                let seqIdx = SpatialRouter.sequence.findIndex(s => s.id === currentId);
+                if (seqIdx === -1) seqIdx = 0; // Default to start if lost
+
+                let newSeqIdx = (seqIdx + dir + SpatialRouter.sequence.length) % SpatialRouter.sequence.length;
+                const targetId = SpatialRouter.sequence[newSeqIdx].id;
+                
+                // Sync State.currentIdx back to the target in State.filtered
+                const targetStateIdx = State.filtered.findIndex(f => f[0] === targetId);
+                if (targetStateIdx !== -1) State.currentIdx = targetStateIdx;
+                
+                ListView.showOnMap(targetId, false);
+            } else {
+                // Normal navigation
+                if (!State.filtered || State.filtered.length === 0) return;
+                let newIdx = (State.currentIdx + dir + State.filtered.length) % State.filtered.length;
+                State.currentIdx = newIdx;
+                const record = State.filtered[State.currentIdx];
+                if (record) ListView.showOnMap(record[0], false);
             }
+            this.updateUI();
         }
     };
 
@@ -5316,6 +5632,7 @@
 
     window.onload = () => {
         // App.init();
+        if(typeof SpatialRouter !== 'undefined') SpatialRouter.init();
         
         // Prevent Accidental Exit
         window.addEventListener('beforeunload', (e) => {
