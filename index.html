@@ -1097,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 31-Jan 02:57 PM 
+                Updated: 31-Jan 03:19 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1975,7 +1975,7 @@
     if (typeof HIERARCHY === 'undefined') window.HIERARCHY = {};
 
     const State = {
-        savedRoutes: {"MC1": "<b>MC-01 District</b><br>Primary Industrial Zone", "MC 2": "<b>MC-02 District</b><br>Residential Hub", "MC3": "<b>MC-03 District</b><br>Commercial Core"}aved_routes%,
+        savedRoutes: [],
         filtered: [],
         availableSurveyors: [], 
         surveyorFilter: [], 
@@ -1995,7 +1995,7 @@
         kmlPane: null
     };
 
-    window.KML_META = %s;
+    window.KML_META = {"MC1": "<b>MC-01 District</b><br>Primary Industrial Zone", "MC 2": "<b>MC-02 District</b><br>Residential Hub", "MC3": "<b>MC-03 District</b><br>Commercial Core"};
 
     const App = {
         toggleQuickFilter(key, e) {
