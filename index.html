@@ -76,11 +76,13 @@
         }
         @media (max-width: 768px) {
             .map-nav { 
-                bottom: 120px; width: 90%; max-width: 320px; 
-                justify-content: space-between; padding: 6px 12px;
+                bottom: 80px; width: 85%; max-width: 280px; 
+                justify-content: space-between; padding: 4px 10px;
             }
+            .map-nav-text { font-size: 11px; }
         }
         .map-nav-text { color: var(--text); font-weight: 700; font-size: 13px; white-space: nowrap; }
+        .float-btn.active { background: var(--primary) !important; color: white !important; }
 
         .record-card {
             flex: 1; display: flex; flex-direction: column; padding: 0 24px 24px 24px;
@@ -1068,7 +1070,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 31-Jan 11:14 AM 
+                Updated: 31-Jan 11:36 AM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1334,6 +1336,9 @@
                 </button>
                 <button class="float-btn" onclick="UniversalSearch.open()" title="Universal Search" style="background:var(--primary); color:white;">
                     <span class="material-icons-round">search</span>
+                </button>
+                <button id="btn-nav-toggle" class="float-btn" onclick="MapNavigator.toggle()" title="Map Navigation">
+                    <span class="material-icons-round">explore</span>
                 </button>
                 <button class="float-btn" onclick="App.toggleLayer()" title="Toggle Satellite">
                     <span class="material-icons-round" id="layer-icon">satellite_alt</span>
@@ -2616,11 +2621,8 @@
 
             this.render();
             this.updateSurveyors();
-            // Pager stays hidden on filter apply until first record interaction/nav
-            if(window.MapNavigator) {
-                const pager = document.getElementById('map-pager');
-                if(pager) pager.style.display = 'none';
-            }
+            // Maintain persistent toggle state but ensure valid count
+            if(window.MapNavigator) MapNavigator.updateUI();
             
             // Universal Sync: Ensure List View stays in sync with sidebar updates
             if(typeof ListView !== 'undefined' && document.getElementById('list-view-stage')?.classList.contains('active')) {
@@ -3077,7 +3079,7 @@
                     }
                 });
                 // Ensure pager appears when house is shown on map
-                if(window.MapNavigator) MapNavigator.updateUI();
+                if(window.MapNavigator) MapNavigator.show();
             }, 1000); // Increased timeout for flyTo completion
         },
 
@@ -5242,13 +5244,26 @@
     window.Stats = Stats;
 
     const MapNavigator = {
+        visible: false,
+        toggle() {
+            this.visible = !this.visible;
+            const btn = document.getElementById('btn-nav-toggle');
+            if (btn) btn.classList.toggle('active', this.visible);
+            this.updateUI();
+        },
+        show() {
+            this.visible = true;
+            const btn = document.getElementById('btn-nav-toggle');
+            if (btn) btn.classList.add('active');
+            this.updateUI();
+        },
         updateUI() {
             // Asynchronous update to avoid conflicts with Leaflet rendering/animations
             setTimeout(() => {
                 const pager = document.getElementById('map-pager');
                 if (!pager) return;
                 
-                if (!State.filtered || State.filtered.length <= 1) {
+                if (!State.filtered || State.filtered.length <= 1 || !this.visible) {
                     pager.style.setProperty('display', 'none', 'important');
                     return;
                 }
