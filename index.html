@@ -1097,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 31-Jan 02:42 PM 
+                Updated: 31-Jan 02:57 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -5283,25 +5283,7 @@
 
 
 
-    // Expose Globals explicitly for inline event handlers and external access
-    window.State = State;
-    window.App = App;
-    window.Sidebar = Sidebar;
-    window.InfoCard = InfoCard;
-    window.Settings = Settings;
-    window.Gallery = Gallery;
-    window.DriveSync = DriveSync;
-    window.LayerManager = LayerManager || {};
-    window.ViewSwitcher = ViewSwitcher;
-    window.ListView = ListView;
-    window.PerformanceLog = PerformanceLog;
-    window.BillVerifier = BillVerifier;
-    window.PaidBills = PaidBills;
-    window.UniversalSearch = UniversalSearch;
-    window.Stats = Stats;
-    window.SpatialRouter = SpatialRouter;
-    window.MapNavigator = MapNavigator;
-
+    // Expose Globals explicitly for inline event handlers and external access (Moved to bottom)
     const SpatialRouter = {
         active: false,
         points: [],
@@ -5622,6 +5604,25 @@
             this.updateUI();
         }
     };
+
+    // Expose Globals explicitly for inline event handlers and external access
+    window.State = State;
+    window.App = App;
+    window.Sidebar = Sidebar;
+    window.InfoCard = InfoCard;
+    window.Settings = Settings;
+    window.Gallery = Gallery;
+    window.DriveSync = DriveSync;
+    window.LayerManager = LayerManager || {};
+    window.ViewSwitcher = ViewSwitcher;
+    window.ListView = ListView;
+    window.PerformanceLog = PerformanceLog;
+    window.BillVerifier = BillVerifier;
+    window.PaidBills = PaidBills;
+    window.UniversalSearch = UniversalSearch;
+    window.Stats = Stats;
+    window.SpatialRouter = SpatialRouter;
+    window.MapNavigator = MapNavigator;
 
     // Global Key Handlers
     document.addEventListener('keydown', (e) => {
