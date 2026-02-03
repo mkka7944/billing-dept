@@ -1097,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 02-Feb 10:18 AM 
+                Updated: 03-Feb 11:11 AM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1729,6 +1729,12 @@
         <div style="text-align:center; color:white; margin-top:20px; font-weight:600;">Point camera at Survey ID QR Code</div>
     </div>
 </div>
+
+<!-- Stable File Inputs for Camera & Sync (Prevents mobile save failures) -->
+<input type="file" id="drive-input-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
+<input type="file" id="drive-input-gallery" accept="image/*" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
+<input type="file" id="local-cam-input" accept="image/*" capture="environment" style="display:none" onchange="LocalCam.handleCapture(this)">
+
 
 <div id="gallery" class="gallery-overlay">
     <div class="gal-header" style="padding: 20px 30px; display: flex; justify-content: flex-end; align-items: center; gap: 24px;">
@@ -3058,12 +3064,8 @@
 
                     <div id="drive-preview" class="sync-preview-strip"></div>
 
-                    <input type="file" id="drive-input-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
-                    <input type="file" id="drive-input-gallery" accept="image/*" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
-                    <input type="file" id="local-cam-input" accept="image/*" capture="environment" style="display:none" onchange="LocalCam.handleCapture(this, '${r[0]}')">
-                    
                     <div class="sync-action-grid">
-                        <button onclick="document.getElementById('local-cam-input').click()" class="sync-action-btn" style="grid-column:span 2; background:#6366f1; color:white; border:none; box-shadow:0 4px 12px rgba(99,102,241,0.2);">
+                        <button onclick="LocalCam.openCamera('${r[0]}')" class="sync-action-btn" style="grid-column:span 2; background:#6366f1; color:white; border:none; box-shadow:0 4px 12px rgba(99,102,241,0.2);">
                             <span class="material-icons-round">camera_enhance</span> Local Camera (Save to Phone)
                         </button>
                         <button onclick="document.getElementById('drive-input-camera').click()" class="sync-action-btn camera">
@@ -3076,6 +3078,7 @@
                             <span class="material-icons-round">cloud_upload</span> Sync Now
                         </button>
                     </div>
+
                 </div>
             `;
             
@@ -3549,8 +3552,18 @@
     };
 
     const LocalCam = {
-        async handleCapture(input, surveyId) {
+        currentSurveyId: null,
+        openCamera(surveyId) {
+            this.currentSurveyId = surveyId;
+            const input = document.getElementById('local-cam-input');
+            if(input) {
+                input.value = ''; // Force change event even if same file
+                input.click();
+            }
+        },
+        async handleCapture(input) {
             if (input.files && input.files[0]) {
+                const surveyId = this.currentSurveyId;
                 const file = input.files[0];
                 const timestamp = Math.floor(Date.now() / 1000);
                 
@@ -3592,7 +3605,7 @@
     const QRScanner = {
         html5QrCode: null,
         
-        open() {
+        async open() {
             document.getElementById('modal-qr').style.display = 'flex';
             
             if (typeof Html5Qrcode === 'undefined') {
@@ -3600,7 +3613,12 @@
                 return;
             }
 
-            this.html5QrCode = new Html5Qrcode("qr-reader");
+            // Reuse single instance and ensure it's stopped before starting
+            if (!this.html5QrCode) {
+                this.html5QrCode = new Html5Qrcode("qr-reader");
+            } else if (this.html5QrCode.isScanning) {
+                await this.html5QrCode.stop();
+            }
             
             // High Performance Config
             const config = { 
@@ -3621,52 +3639,46 @@
                 (errorMessage) => { /* ignore per-frame errors */ }
             ).catch(err => {
                 console.error("Camera start failed", err);
-                alert("Could not start camera: " + err);
+                alert("Could not start camera (check permissions): " + err);
                 this.close();
             });
         },
         
-        onScanSuccess(decodedText) {
+        async onScanSuccess(decodedText) {
             console.log(`Scan matched: ${decodedText}`);
-            this.close();
+            await this.close();
             
-            // Handle URL or simple ID
-            // URLs might be like: https://mkka7944.github.io/billing-dept/scanner.html?sid=12345
             let id = decodedText;
-            
             if (decodedText.includes('sid=')) {
                 try {
                     const url = new URL(decodedText);
                     id = url.searchParams.get('sid');
                 } catch(e) {
-                    // Fallback regex if URL parsing fails
                     const match = decodedText.match(/sid=([^&]+)/);
                     if (match) id = match[1];
                 }
             }
             
             if (id) {
-                // Remove any non-alphanumeric except underscore/hyphen if needed, 
-                // but survey IDs are usually numbers.
                 ListView.jumpFromMap(id);
             } else {
                 alert("Could not parse Survey ID from: " + decodedText);
             }
         },
         
-        close() {
+        async close() {
             if (this.html5QrCode && this.html5QrCode.isScanning) {
-                this.html5QrCode.stop().then(() => {
+                try {
+                    await this.html5QrCode.stop();
                     this.html5QrCode.clear();
-                    document.getElementById('modal-qr').style.display = 'none';
-                }).catch(err => {
-                    document.getElementById('modal-qr').style.display = 'none';
-                });
-            } else {
-                document.getElementById('modal-qr').style.display = 'none';
+                } catch(e) {
+                    console.error("QR Stop Failed", e);
+                }
             }
+            document.getElementById('modal-qr').style.display = 'none';
         }
     };
+
 
     const DriveSync = {
         files: [],
