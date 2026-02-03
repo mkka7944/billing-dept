@@ -1097,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 03-Feb 11:11 AM 
+                Updated: 03-Feb 01:23 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -3618,11 +3618,12 @@
                 this.html5QrCode = new Html5Qrcode("qr-reader");
             } else if (this.html5QrCode.isScanning) {
                 await this.html5QrCode.stop();
+                await new Promise(r => setTimeout(r, 100)); // Hardware cooldown
             }
             
             // High Performance Config
             const config = { 
-                fps: 30, // Increased for fluid tracking
+                fps: 20, // Slightly reduced for broader compatibility
                 qrbox: (viewfinderWidth, viewfinderHeight) => {
                     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                     const size = Math.floor(minEdge * 0.85); // 85% width
@@ -3631,17 +3632,28 @@
                 aspectRatio: 1.0
             };
             
-            // Prefer back camera with HD resolution
-            this.html5QrCode.start(
-                { facingMode: "environment" }, 
-                config, 
-                (decodedText) => this.onScanSuccess(decodedText),
-                (errorMessage) => { /* ignore per-frame errors */ }
-            ).catch(err => {
-                console.error("Camera start failed", err);
-                alert("Could not start camera (check permissions): " + err);
-                this.close();
-            });
+            // Attempt Start
+            try {
+                await this.html5QrCode.start({ facingMode: "environment" }, config, 
+                    (decodedText) => this.onScanSuccess(decodedText),
+                    (errorMessage) => { /* ignore */ }
+                );
+            } catch (err) {
+                console.error("Primary camera start failed, trying fallback...", err);
+                
+                // Fallback: Try with absolutely no constraints if primary fails
+                try {
+                    await new Promise(r => setTimeout(r, 300)); // Longer cooldown for fallback
+                    await this.html5QrCode.start({ facingMode: "environment" }, { fps: 10 }, 
+                        (decodedText) => this.onScanSuccess(decodedText),
+                        (errorMessage) => { /* ignore */ }
+                    );
+                } catch (fallbackErr) {
+                    console.error("Deep camera failure", fallbackErr);
+                    alert("Camera Error: Hardware is likely locked by another app. Please close other camera apps (WhatsApp, etc.) and try again.\n\nDetail: " + fallbackErr);
+                    this.close();
+                }
+            }
         },
         
         async onScanSuccess(decodedText) {
