@@ -1097,7 +1097,7 @@
         <div>
             <div style="font-weight: 700; font-size: 16px;">Field Staff Pro</div>
             <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">
-                Updated: 17-Feb 04:29 PM 
+                Updated: 18-Feb 03:36 PM 
                 <span style="color:var(--primary); margin-left:4px;">[Rev. 1228.2220]</span>
             </div>
         </div>
@@ -1730,12 +1730,6 @@
     </div>
 </div>
 
-<!-- Stable File Inputs for Camera & Sync (Prevents mobile save failures) -->
-<input type="file" id="drive-input-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
-<input type="file" id="drive-input-gallery" accept="image/*" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
-<input type="file" id="local-cam-input" accept="image/*" capture="environment" style="display:none" onchange="LocalCam.handleCapture(this)">
-
-
 <div id="gallery" class="gallery-overlay">
     <div class="gal-header" style="padding: 20px 30px; display: flex; justify-content: flex-end; align-items: center; gap: 24px;">
         <div id="gal-counter" style="color:white; font-weight:700; background:rgba(255,255,255,0.1); padding:8px 18px; border-radius:30px; font-size:15px; backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 15px rgba(0,0,0,0.2);">1 / 1</div>
@@ -1981,7 +1975,7 @@
     if (typeof HIERARCHY === 'undefined') window.HIERARCHY = {};
 
     const State = {
-        savedRoutes: [{"name": "UC-26 Route 1", "savedAt": "2026-02-17T08:01:39.039Z", "startId": null, "endId": null, "sequence": [{"pos": 1, "surveyId": "3294719", "lat": 32.2985483, "lng": 72.0933617, "name": "Amir kbar khana", "address": "Jabi road line 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 2, "surveyId": "3294720", "lat": 32.2985299, "lng": 72.0932912, "name": "Lajpal tent service", "address": "Jabi road line 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 3, "surveyId": "3297973", "lat": 32.298212, "lng": 72.093162, "name": "Anayat medical store", "address": "Jabbi rode 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 4, "surveyId": "3297974", "lat": 32.2981265, "lng": 72.0931712, "name": "Kakra elactric and mob", "address": "Jabbi rode 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 5, "surveyId": "3294716", "lat": 32.2978069, "lng": 72.0929143, "name": "Bismillah autos", "address": "Jabi road line 4", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 6, "surveyId": "3294715", "lat": 32.2976919, "lng": 72.0927568, "name": "Ghulam  mustafa workshop", "address": "Jabi road line 4", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 7, "surveyId": "3298103", "lat": 32.2975095, "lng": 72.0929263, "name": "Punjab karyana store", "address": "Jabi road line 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 8, "surveyId": "3286244", "lat": 32.2956085, "lng": 72.092723, "name": "Zahoor tractor workshop", "address": "Mitha tiwana road line 1", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 9, "surveyId": "3286249", "lat": 32.2957083, "lng": 72.0927847, "name": "Chaman engineering work's", "address": "Mitha tiwana rode 1", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 10, "surveyId": "3286363", "lat": 32.2958684, "lng": 72.0931018, "name": "Kahot trakter", "address": "Jhurabad rode 1", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 11, "surveyId": "3286174", "lat": 32.2960218, "lng": 72.0922689, "name": "mashaAllah ato", "address": "Miyan wali rode", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 12, "surveyId": "3286156", "lat": 32.2960403, "lng": 72.0923648, "name": "MashaAllah mob", "address": "Miyan wali rode 2", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}]}],
+        savedRoutes: [{"name": "UC-26 Route 1", "savedAt": "2026-02-17T08:01:39.039Z", "startId": null, "endId": null, "sequence": [{"pos": 1, "surveyId": "3294719", "lat": 32.2985483, "lng": 72.0933617, "name": "Amir kbar khana", "address": "Jabi road line 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 2, "surveyId": "3294720", "lat": 32.2985299, "lng": 72.0932912, "name": "Lajpal tent service", "address": "Jabi road line 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 3, "surveyId": "3297973", "lat": 32.298212, "lng": 72.093162, "name": "Anayat medical store", "address": "Jabbi rode 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 4, "surveyId": "3297974", "lat": 32.2981265, "lng": 72.0931712, "name": "Kakra elactric and mob", "address": "Jabbi rode 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 5, "surveyId": "3294716", "lat": 32.2978069, "lng": 72.0929143, "name": "Bismillah autos", "address": "Jabi road line 4", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 6, "surveyId": "3294715", "lat": 32.2976919, "lng": 72.0927568, "name": "Ghulam  mustafa workshop", "address": "Jabi road line 4", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 7, "surveyId": "3298103", "lat": 32.2975095, "lng": 72.0929263, "name": "Punjab karyana store", "address": "Jabi road line 3", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 8, "surveyId": "3286244", "lat": 32.2956085, "lng": 72.092723, "name": "Zahoor tractor workshop", "address": "Mitha tiwana road line 1", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 9, "surveyId": "3286249", "lat": 32.2957083, "lng": 72.0927847, "name": "Chaman engineering work's", "address": "Mitha tiwana rode 1", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 10, "surveyId": "3286363", "lat": 32.2958684, "lng": 72.0931018, "name": "Kahot trakter", "address": "Jhurabad rode 1", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 11, "surveyId": "3286174", "lat": 32.2960218, "lng": 72.0922689, "name": "mashaAllah ato", "address": "Miyan wali rode", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}, {"pos": 12, "surveyId": "3286156", "lat": 32.2960403, "lng": 72.0923648, "name": "MashaAllah mob", "address": "Miyan wali rode 2", "mc": "KHUSHAB - UC-26, Mitha Tiwana Janubi, Khushab"}]}, {"name": "Test Route Bhalwal", "sequence": [{"id": "1001", "lat": 32.26, "lng": 72.89}, {"id": "1002", "lat": 32.27, "lng": 72.9}], "savedAt": "2026-02-18T10:00:00Z"}],
         filtered: [],
         availableSurveyors: [], 
         surveyorFilter: [], 
@@ -3064,8 +3058,12 @@
 
                     <div id="drive-preview" class="sync-preview-strip"></div>
 
+                    <input type="file" id="drive-input-camera" accept="image/*" capture="environment" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
+                    <input type="file" id="drive-input-gallery" accept="image/*" multiple style="display:none" onchange="DriveSync.handleFiles(this.files)">
+                    <input type="file" id="local-cam-input" accept="image/*" capture="environment" style="display:none" onchange="LocalCam.handleCapture(this, '${r[0]}')">
+                    
                     <div class="sync-action-grid">
-                        <button onclick="LocalCam.openCamera('${r[0]}')" class="sync-action-btn" style="grid-column:span 2; background:#6366f1; color:white; border:none; box-shadow:0 4px 12px rgba(99,102,241,0.2);">
+                        <button onclick="document.getElementById('local-cam-input').click()" class="sync-action-btn" style="grid-column:span 2; background:#6366f1; color:white; border:none; box-shadow:0 4px 12px rgba(99,102,241,0.2);">
                             <span class="material-icons-round">camera_enhance</span> Local Camera (Save to Phone)
                         </button>
                         <button onclick="document.getElementById('drive-input-camera').click()" class="sync-action-btn camera">
@@ -3078,7 +3076,6 @@
                             <span class="material-icons-round">cloud_upload</span> Sync Now
                         </button>
                     </div>
-
                 </div>
             `;
             
@@ -3552,18 +3549,8 @@
     };
 
     const LocalCam = {
-        currentSurveyId: null,
-        openCamera(surveyId) {
-            this.currentSurveyId = surveyId;
-            const input = document.getElementById('local-cam-input');
-            if(input) {
-                input.value = ''; // Force change event even if same file
-                input.click();
-            }
-        },
-        async handleCapture(input) {
+        async handleCapture(input, surveyId) {
             if (input.files && input.files[0]) {
-                const surveyId = this.currentSurveyId;
                 const file = input.files[0];
                 const timestamp = Math.floor(Date.now() / 1000);
                 
@@ -3605,7 +3592,7 @@
     const QRScanner = {
         html5QrCode: null,
         
-        async open() {
+        open() {
             document.getElementById('modal-qr').style.display = 'flex';
             
             if (typeof Html5Qrcode === 'undefined') {
@@ -3613,17 +3600,11 @@
                 return;
             }
 
-            // Reuse single instance and ensure it's stopped before starting
-            if (!this.html5QrCode) {
-                this.html5QrCode = new Html5Qrcode("qr-reader");
-            } else if (this.html5QrCode.isScanning) {
-                await this.html5QrCode.stop();
-                await new Promise(r => setTimeout(r, 100)); // Hardware cooldown
-            }
+            this.html5QrCode = new Html5Qrcode("qr-reader");
             
             // High Performance Config
             const config = { 
-                fps: 20, // Slightly reduced for broader compatibility
+                fps: 30, // Increased for fluid tracking
                 qrbox: (viewfinderWidth, viewfinderHeight) => {
                     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                     const size = Math.floor(minEdge * 0.85); // 85% width
@@ -3632,65 +3613,60 @@
                 aspectRatio: 1.0
             };
             
-            // Attempt Start
-            try {
-                await this.html5QrCode.start({ facingMode: "environment" }, config, 
-                    (decodedText) => this.onScanSuccess(decodedText),
-                    (errorMessage) => { /* ignore */ }
-                );
-            } catch (err) {
-                console.error("Primary camera start failed, trying fallback...", err);
-                
-                // Fallback: Try with absolutely no constraints if primary fails
-                try {
-                    await new Promise(r => setTimeout(r, 300)); // Longer cooldown for fallback
-                    await this.html5QrCode.start({ facingMode: "environment" }, { fps: 10 }, 
-                        (decodedText) => this.onScanSuccess(decodedText),
-                        (errorMessage) => { /* ignore */ }
-                    );
-                } catch (fallbackErr) {
-                    console.error("Deep camera failure", fallbackErr);
-                    alert("Camera Error: Hardware is likely locked by another app. Please close other camera apps (WhatsApp, etc.) and try again.\n\nDetail: " + fallbackErr);
-                    this.close();
-                }
-            }
+            // Prefer back camera with HD resolution
+            this.html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                (decodedText) => this.onScanSuccess(decodedText),
+                (errorMessage) => { /* ignore per-frame errors */ }
+            ).catch(err => {
+                console.error("Camera start failed", err);
+                alert("Could not start camera: " + err);
+                this.close();
+            });
         },
         
-        async onScanSuccess(decodedText) {
+        onScanSuccess(decodedText) {
             console.log(`Scan matched: ${decodedText}`);
-            await this.close();
+            this.close();
             
+            // Handle URL or simple ID
+            // URLs might be like: https://mkka7944.github.io/billing-dept/scanner.html?sid=12345
             let id = decodedText;
+            
             if (decodedText.includes('sid=')) {
                 try {
                     const url = new URL(decodedText);
                     id = url.searchParams.get('sid');
                 } catch(e) {
+                    // Fallback regex if URL parsing fails
                     const match = decodedText.match(/sid=([^&]+)/);
                     if (match) id = match[1];
                 }
             }
             
             if (id) {
+                // Remove any non-alphanumeric except underscore/hyphen if needed, 
+                // but survey IDs are usually numbers.
                 ListView.jumpFromMap(id);
             } else {
                 alert("Could not parse Survey ID from: " + decodedText);
             }
         },
         
-        async close() {
+        close() {
             if (this.html5QrCode && this.html5QrCode.isScanning) {
-                try {
-                    await this.html5QrCode.stop();
+                this.html5QrCode.stop().then(() => {
                     this.html5QrCode.clear();
-                } catch(e) {
-                    console.error("QR Stop Failed", e);
-                }
+                    document.getElementById('modal-qr').style.display = 'none';
+                }).catch(err => {
+                    document.getElementById('modal-qr').style.display = 'none';
+                });
+            } else {
+                document.getElementById('modal-qr').style.display = 'none';
             }
-            document.getElementById('modal-qr').style.display = 'none';
         }
     };
-
 
     const DriveSync = {
         files: [],
